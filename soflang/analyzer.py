@@ -70,6 +70,7 @@ class UnaryExpr:
 class VariableDeclaration:
     """Represents a variable declaration statement."""
     variable: Variable
+    line: Optional[int] = None
 
 
 @dataclass
@@ -77,6 +78,7 @@ class Assignment:
     """Represents an assignment statement."""
     target: Union[str, ArrayIndex]
     value: Union[Atom, GeneralExpr, UnaryExpr]
+    line: Optional[int] = None
 
 
 @dataclass
@@ -84,6 +86,7 @@ class IfExpression:
     """Represents an if expression statement."""
     condition: Union[Atom, GeneralExpr, UnaryExpr]
     body: List['Statement']
+    line: Optional[int] = None
 
 
 @dataclass
@@ -91,6 +94,7 @@ class WhileExpression:
     """Represents a while expression statement."""
     condition: Union[Atom, GeneralExpr, UnaryExpr]
     body: List['Statement']
+    line: Optional[int] = None
 
 
 # Type alias for Statement
@@ -284,7 +288,7 @@ class BonAnalyzer:
         if stmt_type == 'var_decl':
             var = self._parse_variable_decl(stmt_dict)
             if var:
-                return VariableDeclaration(var)
+                return VariableDeclaration(var, stmt_dict.get('line'))
         elif stmt_type == 'assignment':
             assignment = self._parse_assignment(stmt_dict)
             if assignment:
@@ -313,12 +317,12 @@ class BonAnalyzer:
             var_name = self._get_identifier_value(dest_obj)
             if not var_name:
                 return None
-            return Assignment(var_name, expr)
+            return Assignment(var_name, expr, assignment_dict.get('line'))
         elif dest_type == 'array_index':
             array_index = self._parse_array_index_expr(dest_obj)
             if not array_index:
                 return None
-            return Assignment(array_index, expr)
+            return Assignment(array_index, expr, assignment_dict.get('line'))
         
         return None
     
@@ -342,7 +346,7 @@ class BonAnalyzer:
         body_raw = if_dict.get('body', [])
         body = self._parse_body(body_raw)
         
-        return IfExpression(condition, body)
+        return IfExpression(condition, body, if_dict.get('line'))
     
     def _parse_while_expr(self, while_dict: Dict) -> Optional[WhileExpression]:
         """Parse WHILE_EXPR structures with expression conditions."""
@@ -355,7 +359,7 @@ class BonAnalyzer:
         body_raw = while_dict.get('body', [])
         body = self._parse_body(body_raw)
         
-        return WhileExpression(condition, body)
+        return WhileExpression(condition, body, while_dict.get('line'))
     
     def _parse_expression(self, expr_dict: Any) -> Optional[Union[Atom, GeneralExpr, UnaryExpr]]:
         """Parse an expression: ATOM, GENERAL_EXPR, or UNARY_EXPR"""

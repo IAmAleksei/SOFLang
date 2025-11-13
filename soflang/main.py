@@ -4,9 +4,9 @@ from typing import List
 from soflang import centi_parser
 from soflang.analyzer import BonAnalyzer, Function
 from soflang.asm import (
-    TinyTranslator,
-    parse_asm,
+    parse_asm, translate,
 )
+from soflang.debugger import run_debugger
 from soflang.lvm import LionVM
 from soflang.validator import MilliValidator
 
@@ -14,7 +14,7 @@ from soflang.validator import MilliValidator
 def parse(ifile: str, ofile: str):
     with open(ifile, 'r') as f:
         text = "".join(f.readlines())
-    out = centi_parser.parse_program(text)
+    out = centi_parser.Parser().parse_program(text)
     with open(ofile, 'w') as f:
         json.dump(out, f, indent=1, default=str)
 
@@ -38,8 +38,7 @@ def validator(functions: List[Function]) -> bool:
 
 
 def asm(functions: List[Function], ofile: str):
-    t = TinyTranslator()
-    instructions = t.translate(functions)
+    instructions = translate(functions).asm_instructions
     with open(ofile, 'w') as f:
         for i in instructions:
             f.write(f"{i.__str__()}\n")
@@ -48,14 +47,13 @@ def asm(functions: List[Function], ofile: str):
 def execute(ifile):
     with open(ifile, 'r') as f:
         instructions = parse_asm(f.readlines())
-    l = LionVM()
-    l.run(instructions)
+    LionVM().run(instructions)
 
 
 def compile_and_run(ifile):
     with open(ifile, 'r') as f:
         text = "".join(f.readlines())
-    parsed = centi_parser.parse_program(text)
+    parsed = centi_parser.Parser().parse_program(text)
 
     analyzed = BonAnalyzer().analyze(parsed)
 
@@ -66,9 +64,28 @@ def compile_and_run(ifile):
             print("-", err)
         return
 
-    asm_instructions = TinyTranslator().translate(analyzed)
+    asm_instructions = translate(analyzed, with_debug=False).asm_instructions
 
     LionVM().run(asm_instructions)
+
+
+def compile_and_debug(ifile):
+    with open(ifile, 'r') as f:
+        lines = f.readlines()
+    text = "".join(lines)
+    parsed = centi_parser.Parser().parse_program(text)
+
+    analyzed = BonAnalyzer().analyze(parsed)
+
+    errors = MilliValidator().validate(analyzed)
+    if errors:
+        print("Found errors:")
+        for err in errors:
+            print("-", err)
+        return
+
+    enriched_result = translate(analyzed, with_debug=True)
+    run_debugger(enriched_result, lines)
 
 
 def main():
@@ -98,6 +115,11 @@ def main():
     )
     execute_parser.add_argument("input", help="Input .sofl file")
 
+    execute_parser = subparsers.add_parser(
+        "compile-and-debug", help="Perform all steps - compile, analyze, translate, debug"
+    )
+    execute_parser.add_argument("input", help="Input .sofl file")
+
     args = arg_parser.parse_args()
 
     if args.command == "parse":
@@ -111,6 +133,8 @@ def main():
         execute(args.input)
     elif args.command == "compile-and-run":
         compile_and_run(args.input)
+    elif args.command == "compile-and-debug":
+        compile_and_debug(args.input)
 
 
 if __name__ == '__main__':

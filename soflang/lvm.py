@@ -15,7 +15,6 @@ class LionVM:
         while True:
             steps += 1
             i = instructions[ec.ip]
-            print(i)
             if isinstance(i, ExitI):
                 break
             else:
