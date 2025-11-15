@@ -22,7 +22,7 @@ class VarDebugInfo:
 class Debugger:
     def __init__(self, compiled_code_with_debug_info: TranslationResult, source_code: List[str]):
         self.history: List[ExecutionContext] = []
-        self.ec = ExecutionContext([0] * 300, 20, 0)
+        self.ec = ExecutionContext([0] * 300, 20, 0, binary_source=False)
         self.steps = 0
         self.instructions = compiled_code_with_debug_info.asm_instructions
         self.debug_info = compiled_code_with_debug_info

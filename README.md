@@ -1,4 +1,4 @@
-### Scarcely Object-Oriented and Functional Language
+### SOFLang - Scarcely Object-Oriented and Functional Language
 
 Trivial programming language with its own syntax and issues.
 

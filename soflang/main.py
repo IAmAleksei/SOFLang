@@ -6,12 +6,15 @@ from soflang.analyzer import BonAnalyzer, Function
 from soflang.asm import (
     parse_asm, translate,
 )
+from soflang.binarify import decode_binary_asm, encode_binary_asm
 from soflang.debugger import run_debugger
 from soflang.lvm import LionVM
 from soflang.validator import MilliValidator
 
 
-def parse(ifile: str, ofile: str):
+def parse(ifile: str):
+    assert ifile.endswith('.sofl')
+    ofile = ifile[:-5] + '.json'
     with open(ifile, 'r') as f:
         text = "".join(f.readlines())
     out = centi_parser.Parser().parse_program(text)
@@ -44,10 +47,25 @@ def asm(functions: List[Function], ofile: str):
             f.write(f"{i.__str__()}\n")
 
 
-def execute(ifile):
+def binarify_asm(ifile: str):
+    assert ifile.endswith('.sasm')
+    ofile = ifile[:-5] + '.bsasm'
     with open(ifile, 'r') as f:
         instructions = parse_asm(f.readlines())
-    LionVM().run(instructions)
+    bs = encode_binary_asm(instructions)
+    with open(ofile, 'wb') as f:
+        f.write(bs)
+
+
+def execute(ifile: str):
+    if ifile.endswith('.sasm'):
+        with open(ifile, 'r') as f:
+            instructions = parse_asm(f.readlines())
+        LionVM().run(instructions)
+    elif ifile.endswith('.bsasm'):
+        with open(ifile, 'rb') as f:
+            bcode = f.read()
+        LionVM().run_binary(bcode)
 
 
 def compile_and_run(ifile):
@@ -96,17 +114,20 @@ def main():
 
     parse_parser = subparsers.add_parser("parse", help="Parse source into JSON")
     parse_parser.add_argument("input", help="Input source file")
-    parse_parser.add_argument("output", help="Output JSON file")
 
     analyze_parser = subparsers.add_parser(
         "analyze-validate-translate",
         help="Analyze parsed JSON, validate, and emit assembly instructions",
     )
     analyze_parser.add_argument("input", help="Input JSON file")
-    analyze_parser.add_argument("output", help="Output assembly file")
 
     execute_parser = subparsers.add_parser(
         "execute", help="Execute assembly instructions with the LionVM"
+    )
+    execute_parser.add_argument("input", help="Input assembly file")
+
+    execute_parser = subparsers.add_parser(
+        "binarify", help="Compacts input text assembler file to binary assembler"
     )
     execute_parser.add_argument("input", help="Input assembly file")
 
@@ -123,14 +144,18 @@ def main():
     args = arg_parser.parse_args()
 
     if args.command == "parse":
-        parse(args.input, args.output)
+        parse(args.input)
     elif args.command == "analyze-validate-translate":
+        assert args.input.endswith('.json')
+        ofile = args.input[:-5] + '.sasm'
         functions = analyze(args.input)
         success = validator(functions)
         if success:
-            asm(functions, args.output)
+            asm(functions, ofile)
     elif args.command == "execute":
         execute(args.input)
+    elif args.command == "binarify":
+        binarify_asm(args.input)
     elif args.command == "compile-and-run":
         compile_and_run(args.input)
     elif args.command == "compile-and-debug":
