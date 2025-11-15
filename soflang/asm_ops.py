@@ -334,6 +334,17 @@ class AllocI(Instruction):
         return binarify_instruction(64, [(2, self.size)])
 
 
+class CrashI(Instruction):
+    def apply(self, ec: ExecutionContext):
+        raise ValueError("Exception")
+
+    def __str__(self):
+        return f"CRASH"
+
+    def binarify(self):
+        return binarify_instruction(65)
+
+
 class ExitI(Instruction):
     def apply(self, ec: ExecutionContext):
         raise ValueError()

@@ -69,6 +69,8 @@ def decode_binary_asm(bytes: bytes, idx) -> Instruction:
         return ReturnI()
     elif opcode == 64:
         return AllocI(decode_binary_value(bytes, idx + 1, 2))
+    elif opcode == 65:
+        return CrashI()
     elif opcode == 255:
         return ExitI()
     else:

@@ -48,12 +48,15 @@ class Debugger:
                     VarDebugInfo(self.debug_info.variable_allocations[cur_ip], self.ec.sp - i.size + 1, i.size)
                 )
             elif isinstance(i, PopI):
+                # TODO: it loses variables because of after-func parameters popping
                 self.vars.pop()
             self.cur_line = self.debug_info.source_code_lines[self.ec.ip]
+        else:
+            raise ValueError("End")
 
     def print_state(self):
         stack_end = self.ec.sp + 1
-        stack_start = stack_end - 20
+        stack_start = stack_end - 40
         print()
         print(f"-----------------------------------------------------------{stack_end}")
         print(f"| {' '.join(map(str, self.ec.stack[stack_start:stack_end:][::-1]))}")
@@ -75,14 +78,15 @@ class Debugger:
         print()
 
 
-def move_forward(debugger):
-    debugger.forward()
-    debugger.print_state()
-
-
 def run_debugger(compiled_code_with_debug_info: TranslationResult, source_code: list[str]):
     debugger = Debugger(compiled_code_with_debug_info, source_code)
     debugger.print_state()
     while True:
-        input()
-        move_forward(debugger)
+        i = input()
+        if i == "":
+            debugger.forward()
+        elif i == "l":
+            prev_line = debugger.cur_line
+            while debugger.cur_line == prev_line:
+                debugger.forward()
+        debugger.print_state()

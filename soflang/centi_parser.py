@@ -3,9 +3,9 @@ import string
 
 ParserElement.setDefaultWhitespaceChars(' \t')
 
-LPAR, RPAR, LBRACK, RBRACK, LBRACE, RBRACE, SEMI, COMMA, LN, EQ = map(Suppress, "()[]{};,\n=")
+LPAR, RPAR, LBRACK, RBRACK, LBRACE, RBRACE, COLON, SEMI, COMMA, LN, EQ, SHARP = map(Suppress, "()[]{}:;,\n=#")
 
-NUM, IF, WHILE = map(Keyword, "num ?? ?.".split())
+IF, WHILE = map(Keyword, "?? ...?".split())
 
 
 class Parser:
@@ -22,11 +22,14 @@ class Parser:
         return {'type': 'integer', 'value': int(tokens[0])}
 
     def enrich_array_type(self, tokens):
-        size_val = tokens[0].get('size').get('value')
-        return {'kind': {'dim': 'array', 'size': int(size_val)}, 'base': 'num'}
+        data = tokens[0]
+        base = data.get('base_type').get('value')
+        size_val = data.get('size').get('value')
+        return {'kind': {'dim': 'array', 'size': int(size_val)}, 'base': base}
 
     def enrich_simple_type(self, tokens):
-        return {'kind': {'dim': 'simple'}, 'base': 'num'}
+        base = tokens[0]
+        return {'kind': {'dim': 'simple'}, 'base': base}
 
     def enrich_var_decl(self, tokens):
         start_symbol = tokens[0].locn_start
@@ -52,6 +55,17 @@ class Parser:
             'parameters': params
         }
 
+    def enrich_constructor_call(self, tokens):
+        data = tokens[0]
+        func_name = data.get('clazz_name').get('value')
+        params = list(data.get('parameters', []))
+
+        return {
+            'type': 'constructor_call',
+            'identifier': func_name,
+            'parameters': params
+        }
+
     def enrich_array_index(self, tokens):
         data = tokens[0]
         var_name = data[0].get('value')
@@ -61,6 +75,17 @@ class Parser:
             'type': 'array_index',
             'var_name': var_name,
             'index': index
+        }
+
+    def enrich_field_access(self, tokens):
+        data = tokens[0]
+        var_name = data[0].get('value')
+        field = data[1].get('value')
+
+        return {
+            'type': 'field_access',
+            'var_name': var_name,
+            'field': field
         }
 
     def make_atom(self, tokens):
@@ -152,31 +177,61 @@ class Parser:
             'parameters': parameters
         }
 
+    def enrich_field_decl(self, tokens):
+        inner = tokens[0]
+
+        field_name = inner.get('field_name').get('value')
+        type = inner.get('type')[0]
+
+        return {
+            'type': 'field_decl',
+            'identifier': field_name,
+            'kind': type
+        }
+
+    def enrich_clazz_decl(self, tokens):
+        inner = tokens[0]
+
+        clazz_name = inner.get('clazz_name').get('value')
+        types = inner.get('types')
+        types = [t for t in types]
+
+        return {
+            'type': 'clazz_decl',
+            'identifier': clazz_name,
+            'types': types
+        }
+
     def enrich_global_expr(self, tokens):
-        funcs = [item for item in tokens]
-        return funcs
+        funcs_and_clazzes = [item for item in tokens]
+        return funcs_and_clazzes
 
     def parse_program(self, text) -> list:
         integer = Regex(r'[+-]?\d+')
-        identifier = Word(string.ascii_lowercase)
+        clazz = Word(string.ascii_uppercase, string.ascii_lowercase)
+        clazz.setParseAction(self.make_identifier)
+        identifier = Word(string.ascii_lowercase, string.ascii_lowercase + string.digits + '_')
         identifier.setParseAction(self.make_identifier)
         integer.setParseAction(self.make_integer)
-        array_type = Group(NUM("base_type") + "*" + integer("size"))
+        array_type = Group(clazz("base_type") + "*" + integer("size"))
         array_type.setParseAction(self.enrich_array_type)
-        simple_type = NUM("base_type")
+        simple_type = clazz("base_type")
         simple_type.setParseAction(self.enrich_simple_type)
         TYPE = array_type | simple_type
         var_decl = locatedExpr(Group(TYPE("type") + identifier("var_name")))
         var_decl.setParseAction(self.enrich_var_decl)
         line_expr = Forward()
-        infunc_exprs = Forward()
         # TODO: allow consts and exprs as a parameters.
         function_call = Group(identifier("func_name") + LPAR + Optional(delimitedList(identifier))("parameters") + RPAR)
         function_call.setParseAction(self.enrich_function_call)
+        constructor_call = Group(clazz("clazz_name") + LPAR + Optional(delimitedList(identifier))("parameters") + RPAR)
+        constructor_call.setParseAction(self.enrich_constructor_call)
         array_index = Group(identifier + LBRACK + (integer | identifier) + RBRACK)
         array_index.setParseAction(self.enrich_array_index)
+        field_access = Group(identifier + SHARP + identifier)
+        field_access.setParseAction(self.enrich_field_access)
         # Allow this in function call
-        atom = integer | function_call | array_index | identifier
+        atom = integer | function_call | constructor_call | array_index | field_access | identifier
         atom.setParseAction(self.make_atom)
         expr = Group(atom + oneOf("* / + -") + atom)
         expr.setParseAction(self.enrich_binary_expr)
@@ -185,20 +240,32 @@ class Parser:
         gen_expr = expr | unary_expr | atom
         assignment = locatedExpr(Group((array_index | identifier) + EQ + gen_expr))
         assignment.setParseAction(self.enrich_assignment)
-        infunc_exprs <<= ZeroOrMore(Group(line_expr) + OneOrMore(LN))
+        infunc_exprs = ZeroOrMore(Group(line_expr) + OneOrMore(LN))
         if_expr = locatedExpr(Group(gen_expr + IF + LBRACE + LN + infunc_exprs + RBRACE))
         if_expr.setParseAction(self.enrich_if_expr)
         while_expr = locatedExpr(Group(gen_expr + WHILE + LBRACE + LN + infunc_exprs + RBRACE))
         while_expr.setParseAction(self.enrich_while_expr)
-        line_expr <<= (assignment | if_expr | var_decl | while_expr)
+        error_expr = locatedExpr(Group(Keyword("error")))
+        error_expr.setParseAction(lambda x: {'type': 'throw_error', 'line': self.get_line(x[0].locn_start)})
+        line_expr <<= (assignment | if_expr | var_decl | while_expr | error_expr)
         line_expr.setParseAction(self.enrich_line_expr)
         func_decl = Group(TYPE("return_type") + identifier("func_name") + LPAR + Optional(delimitedList(var_decl))("parameters") + RPAR + LBRACE + LN + Group(ZeroOrMore(Group(line_expr) + LN))("statements") + RBRACE)
         func_decl.setParseAction(self.enrich_func_decl)
-        global_expr = ZeroOrMore(LN) + ZeroOrMore(func_decl + OneOrMore(LN))
+        field_decl = Group(identifier("field_name") + SHARP + TYPE("type"))
+        field_decl.setParseAction(self.enrich_field_decl)
+        clazz_decl = Group(clazz("clazz_name") + COLON + delimitedList(field_decl, delim='x')("types"))
+        clazz_decl.setParseAction(self.enrich_clazz_decl)
+        global_expr = ZeroOrMore(LN) + ZeroOrMore((func_decl | clazz_decl) + OneOrMore(LN))
         global_expr.setParseAction(self.enrich_global_expr)
         self.text = text
         return list(global_expr.parse_string(self.text, parse_all=True))
+# TODO: arrays with variable size.
+# TODO: support templates.
 
+
+def parse_program(text: str) -> list:
+    """Convenience function to parse a program."""
+    return Parser().parse_program(text)
 
 if __name__ == '__main__':
     result = Parser().parse_program("""

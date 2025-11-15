@@ -1,20 +1,28 @@
 from typing import Dict, List, Optional, Tuple, Any, Union
 from dataclasses import dataclass
-from enum import Enum
 
 
-class Type(Enum):
-    """Type enumeration for SoLang types."""
-    NUM = "num"
-    ARRAY = "array"
+@dataclass
+class Field:
+    """Represents a field declaration in a class."""
+    name: str
+    class_type: Union[str, 'Class']  # Class name (e.g., 'Num', 'Point')
+    array_size: Optional[int] = None  # None for simple types, int for arrays
+
+
+@dataclass
+class Class:
+    """Represents a class declaration."""
+    name: str
+    fields: List[Field]
 
 
 @dataclass
 class Variable:
     """Represents a variable declaration."""
     name: str
-    type: Type
-    array_size: Optional[int] = None
+    class_type: str  # Class name (e.g., 'Num', 'Point')
+    array_size: Optional[int] = None  # None for simple types, int for arrays
 
 
 # Expression classes
@@ -45,9 +53,23 @@ class ArrayIndex:
 
 
 @dataclass
+class FieldAccess:
+    """Represents a field access expression."""
+    var_name: str
+    field: str
+
+
+@dataclass
+class ConstructorCall:
+    """Represents a constructor call."""
+    class_name: str
+    parameters: List[str]  # List of variable names
+
+
+@dataclass
 class Atom:
     """Represents an ATOM expression."""
-    value: Union[IntegerLiteral, IdentifierExpr, FunctionCall, ArrayIndex]
+    value: Union[IntegerLiteral, IdentifierExpr, FunctionCall, ArrayIndex, FieldAccess, ConstructorCall]
 
 
 @dataclass
@@ -97,16 +119,21 @@ class WhileExpression:
     line: Optional[int] = None
 
 
+@dataclass
+class Throwable:
+    line: Optional[int] = None
+
+
 # Type alias for Statement
-Statement = Union[VariableDeclaration, Assignment, IfExpression, WhileExpression]
+Statement = Union[VariableDeclaration, Assignment, IfExpression, WhileExpression | Throwable]
 
 
 @dataclass
 class Function:
     """Represents a function declaration."""
     name: str
-    return_type: Type
-    return_array_size: Optional[int] = None
+    return_class_type: str  # Class name (e.g., 'Num', 'Point')
+    return_array_size: Optional[int] = None  # None for simple types, int for arrays
     parameters: List[Variable] = None
     body: List[Statement] = None  # Parsed body statements
     
@@ -161,26 +188,38 @@ class BonAnalyzer:
     
     def __init__(self):
         self.functions: Dict[str, Function] = {}
-    
-    def analyze(self, parsed_program: List[Dict]) -> List[Function]:
+        self.classes: Dict[str, Class] = {}
+
+    def get_functions(self):
+        return list(self.functions.values())
+
+    def analyze(self, parsed_program: List[Dict]):
         """
         Transform a parsed program into a list of Function objects.
         
         Args:
-            parsed_program: List of function declarations (dict structure from parse_program)
+            parsed_program: List of function and class declarations (dict structure from parse_program)
             
         Returns:
             List of Function objects
         """
         self.functions = {}
+        self.classes = {}
         
-        # Process all function declarations
-        for func_decl in parsed_program:
-            if isinstance(func_decl, dict) and func_decl.get('type') == 'func_decl':
-                self._process_function_declaration(func_decl)
+        # Num is a built-in class (no fields, represents primitive numbers)
+        # It's always available
+        self.classes['Num'] = Class('Num', [])
         
-        return list(self.functions.values())
-    
+        # First pass: process all class declarations
+        for decl in parsed_program:
+            if isinstance(decl, dict) and decl.get('type') == 'clazz_decl':
+                self._process_class_declaration(decl)
+
+        # Second pass: process all function declarations
+        for decl in parsed_program:
+            if isinstance(decl, dict) and decl.get('type') == 'func_decl':
+                self._process_function_declaration(decl)
+
     def _process_function_declaration(self, func_decl: Dict):
         """Process a function declaration to extract its signature and body."""
         if func_decl.get('type') != 'func_decl':
@@ -188,7 +227,7 @@ class BonAnalyzer:
         
         # Extract return type
         kind = func_decl.get('kind')
-        return_type, return_array_size = self._parse_type(kind)
+        return_class_type, return_array_size = self._parse_type(kind)
         
         # Extract function name
         func_name_obj = func_decl.get('identifier')
@@ -209,32 +248,47 @@ class BonAnalyzer:
         body_raw = func_decl.get('body', [])
         body = self._parse_body(body_raw)
         
-        func = Function(func_name, return_type, return_array_size, parameters, body)
+        func = Function(func_name, return_class_type, return_array_size, parameters, body)
         self.functions[func_name] = func
     
-    def _parse_type(self, type_dict: Dict) -> Tuple[Type, Optional[int]]:
-        """Parse TYPE structure: {'kind': {'dim': 'simple'} or {'dim': 'array', 'size': int}, 'base': 'num'}"""
+    def _parse_type(self, type_dict: Dict) -> Tuple[str, Optional[int]]:
+        """Parse TYPE structure: {'kind': {'dim': 'simple'} or {'dim': 'array', 'size': int}, 'base': class_name}
+        Returns: (class_type, array_size)
+        All types are class types, including 'Num'.
+        """
         if not isinstance(type_dict, dict):
-            return Type.NUM, None
+            return 'Num', None
         
-        base = type_dict.get('base', 'num')
+        base = type_dict.get('base')
         kind = type_dict.get('kind', {})
         
         if not isinstance(kind, dict):
-            return Type.NUM, None
+            return 'Num', None
         
         dim = kind.get('dim')
+        
+        # Extract class name from base
+        if isinstance(base, dict) and base.get('type') == 'identifier':
+            class_name = base.get('value')
+        elif isinstance(base, str):
+            class_name = base
+        else:
+            return 'Num', None
+        
+        # Class name should already be uppercase (from parser) - no normalization needed
+        if not class_name:
+            return 'Num', None
+        
+        # Check if it's an array
         if dim == 'array':
             size = kind.get('size')
             try:
                 size = int(size) if size is not None else None
-                return Type.ARRAY, size
+                return class_name, size
             except (ValueError, TypeError):
-                return Type.ARRAY, None
-        elif dim == 'simple':
-            return Type.NUM, None
-        
-        return Type.NUM, None
+                return class_name, None
+        else:
+            return class_name, None
     
     def _parse_variable_decl(self, var_decl: Dict) -> Optional[Variable]:
         """Parse VAR_DECL structure: {'kind': TYPE, 'type': 'var_decl', 'identifier': IDENTIFIER}"""
@@ -248,8 +302,8 @@ class BonAnalyzer:
         if not var_name:
             return None
         
-        var_type, array_size = self._parse_type(kind)
-        return Variable(var_name, var_type, array_size)
+        class_type, array_size = self._parse_type(kind)
+        return Variable(var_name, class_type, array_size)
     
     def _get_identifier_value(self, identifier_obj: Dict) -> Optional[str]:
         """Extract value from IDENTIFIER structure: {'type': 'identifier', 'value': str}"""
@@ -266,7 +320,7 @@ class BonAnalyzer:
     
     def _is_identifier(self, token: str) -> bool:
         """Check if token is an identifier (lowercase letters only)."""
-        return isinstance(token, str) and token.isalpha() and token.islower()
+        return True
     
     def _parse_body(self, body_raw: List[Dict]) -> List[Statement]:
         """Parse function body from raw LINE_EXPR structures."""
@@ -297,7 +351,9 @@ class BonAnalyzer:
             return self._parse_if_expr(stmt_dict)
         elif stmt_type == 'while_expr':
             return self._parse_while_expr(stmt_dict)
-        
+        elif stmt_type == 'throw_error':
+            return Throwable()
+
         return None
     
     def _parse_assignment(self, assignment_dict: Dict) -> Optional[Assignment]:
@@ -423,8 +479,49 @@ class BonAnalyzer:
             array_index = self._parse_array_index_expr(atom_dict)
             if array_index:
                 return Atom(array_index)
+        elif token_type == 'field_access':
+            field_access = self._parse_field_access(atom_dict)
+            if field_access:
+                return Atom(field_access)
+        elif token_type == 'constructor_call':
+            constructor_call = self._parse_constructor_call(atom_dict)
+            if constructor_call:
+                return Atom(constructor_call)
         
         return None
+    
+    def _parse_field_access(self, field_access_dict: Dict) -> Optional[FieldAccess]:
+        """Parse FIELD_ACCESS: {'type': 'field_access', 'var_name': IDENTIFIER_STR, 'field': IDENTIFIER_STR}"""
+        var_name_obj = field_access_dict.get('var_name')
+        var_name = self._get_identifier_value(var_name_obj)
+        
+        if not var_name:
+            return None
+        
+        field_obj = field_access_dict.get('field')
+        field = self._get_identifier_value(field_obj)
+        
+        if not field:
+            return None
+        
+        return FieldAccess(var_name, field)
+    
+    def _parse_constructor_call(self, constructor_call_dict: Dict) -> Optional[ConstructorCall]:
+        """Parse CONSTRUCTOR_CALL: {'type': 'constructor_call', 'identifier': CLASS_NAME_STR, 'parameters': list of IDENTIFIERs}"""
+        class_name_obj = constructor_call_dict.get('identifier')
+        class_name = self._get_class_name(class_name_obj)
+        
+        if not class_name:
+            return None
+        
+        parameters_raw = constructor_call_dict.get('parameters', [])
+        parameters = []
+        for param_obj in parameters_raw:
+            param_name = self._get_identifier_value(param_obj)
+            if param_name:
+                parameters.append(param_name)
+        
+        return ConstructorCall(class_name, parameters)
     
     def _parse_function_call(self, func_call_dict: Dict) -> Optional[FunctionCall]:
         """Parse FUNCTION_CALL: {'type': 'func_call', 'identifier': IDENTIFIER_STR, 'parameters': list of IDENTIFIERs}"""
@@ -458,3 +555,54 @@ class BonAnalyzer:
             return None
         
         return ArrayIndex(var_name, index)
+    
+    def _process_class_declaration(self, clazz_decl: Dict):
+        """Process a class declaration to extract its name and fields."""
+        if clazz_decl.get('type') != 'clazz_decl':
+            return
+        
+        # Extract class name
+        clazz_name_obj = clazz_decl.get('identifier')
+        clazz_name = self._get_class_name(clazz_name_obj)
+        
+        if not clazz_name:
+            return  # Skip if no valid class name
+        
+        # Extract fields
+        fields = []
+        types_data = clazz_decl.get('types', [])
+        for field_decl in types_data:
+            if isinstance(field_decl, dict) and field_decl.get('type') == 'field_decl':
+                field = self._parse_field_decl(field_decl)
+                if field:
+                    fields.append(field)
+
+        clazz = Class(clazz_name, fields)
+        self.classes[clazz_name] = clazz
+
+    def _get_class_name(self, identifier_obj: Any) -> Optional[str]:
+        """Extract class name from identifier (uppercase)."""
+        if isinstance(identifier_obj, dict):
+            if identifier_obj.get('type') == 'identifier':
+                value = identifier_obj.get('value')
+                if isinstance(value, str) and value and value[0].isupper():
+                    return value
+        elif isinstance(identifier_obj, str) and identifier_obj and identifier_obj[0].isupper():
+            return identifier_obj
+        return None
+    
+    def _parse_field_decl(self, field_decl: Dict) -> Optional[Field]:
+        """Parse FIELD_DECL structure: {'type': 'field_decl', 'identifier': IDENTIFIER, 'kind': TYPE}"""
+        if not isinstance(field_decl, dict) or field_decl.get('type') != 'field_decl':
+            return None
+        
+        identifier_obj = field_decl.get('identifier')
+        field_name = self._get_identifier_value(identifier_obj)
+        
+        if not field_name:
+            return None
+        
+        kind = field_decl.get('kind')
+        class_type, array_size = self._parse_type(kind)
+
+        return Field(field_name, class_type, array_size)

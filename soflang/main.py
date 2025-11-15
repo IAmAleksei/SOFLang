@@ -12,60 +12,61 @@ from soflang.lvm import LionVM
 from soflang.validator import MilliValidator
 
 
-def parse(ifile: str):
-    assert ifile.endswith('.sofl')
-    ofile = ifile[:-5] + '.json'
-    with open(ifile, 'r') as f:
-        text = "".join(f.readlines())
-    out = centi_parser.Parser().parse_program(text)
-    with open(ofile, 'w') as f:
-        json.dump(out, f, indent=1, default=str)
-
-
-def analyze(ifile: str) -> List[Function]:
-    a = BonAnalyzer()
-    with open(ifile, 'r') as f:
-        text = json.load(f)
-    return a.analyze(text)
-
-
-def validator(functions: List[Function]) -> bool:
-    v = MilliValidator()
-    errors = v.validate(functions)
-    if errors:
-        print("Found errors:")
-        for err in errors:
-            print("-", err)
-        return False
-    return True
-
-
-def asm(functions: List[Function], ofile: str):
-    instructions = translate(functions).asm_instructions
-    with open(ofile, 'w') as f:
-        for i in instructions:
-            f.write(f"{i.__str__()}\n")
-
-
-def binarify_asm(ifile: str):
-    assert ifile.endswith('.sasm')
-    ofile = ifile[:-5] + '.bsasm'
-    with open(ifile, 'r') as f:
-        instructions = parse_asm(f.readlines())
-    bs = encode_binary_asm(instructions)
-    with open(ofile, 'wb') as f:
-        f.write(bs)
-
-
-def execute(ifile: str):
-    if ifile.endswith('.sasm'):
-        with open(ifile, 'r') as f:
-            instructions = parse_asm(f.readlines())
-        LionVM().run(instructions)
-    elif ifile.endswith('.bsasm'):
-        with open(ifile, 'rb') as f:
-            bcode = f.read()
-        LionVM().run_binary(bcode)
+# def parse(ifile: str):
+#     assert ifile.endswith('.sofl')
+#     ofile = ifile[:-5] + '.json'
+#     with open(ifile, 'r') as f:
+#         text = "".join(f.readlines())
+#     out = centi_parser.Parser().parse_program(text)
+#     with open(ofile, 'w') as f:
+#         json.dump(out, f, indent=1, default=str)
+#
+#
+# def analyze(ifile: str) -> List[Function]:
+#     a = BonAnalyzer()
+#     with open(ifile, 'r') as f:
+#         text = json.load(f)
+#     a.analyze(text)
+#     return a.get_functions()
+#
+#
+# def validator(functions: List[Function]) -> bool:
+#     v = MilliValidator()
+#     errors = v.validate(functions)
+#     if errors:
+#         print("Found errors:")
+#         for err in errors:
+#             print("-", err)
+#         return False
+#     return True
+#
+#
+# def asm(functions: List[Function], ofile: str):
+#     instructions = translate(functions).asm_instructions
+#     with open(ofile, 'w') as f:
+#         for i in instructions:
+#             f.write(f"{i.__str__()}\n")
+#
+#
+# def binarify_asm(ifile: str):
+#     assert ifile.endswith('.sasm')
+#     ofile = ifile[:-5] + '.bsasm'
+#     with open(ifile, 'r') as f:
+#         instructions = parse_asm(f.readlines())
+#     bs = encode_binary_asm(instructions)
+#     with open(ofile, 'wb') as f:
+#         f.write(bs)
+#
+#
+# def execute(ifile: str):
+#     if ifile.endswith('.sasm'):
+#         with open(ifile, 'r') as f:
+#             instructions = parse_asm(f.readlines())
+#         LionVM().run(instructions)
+#     elif ifile.endswith('.bsasm'):
+#         with open(ifile, 'rb') as f:
+#             bcode = f.read()
+#         LionVM().run_binary(bcode)
 
 
 def compile_and_run(ifile):
@@ -73,16 +74,17 @@ def compile_and_run(ifile):
         text = "".join(f.readlines())
     parsed = centi_parser.Parser().parse_program(text)
 
-    analyzed = BonAnalyzer().analyze(parsed)
+    analyzer = BonAnalyzer()
+    analyzer.analyze(parsed)
 
-    errors = MilliValidator().validate(analyzed)
+    errors = MilliValidator().validate(analyzer.get_functions(), analyzer.classes)
     if errors:
         print("Found errors:")
         for err in errors:
             print("-", err)
         return
 
-    asm_instructions = translate(analyzed, with_debug=False).asm_instructions
+    asm_instructions = translate(analyzer.get_functions(), analyzer.classes, with_debug=False).asm_instructions
 
     LionVM().run(asm_instructions)
 
@@ -93,16 +95,17 @@ def compile_and_debug(ifile):
     text = "".join(lines)
     parsed = centi_parser.Parser().parse_program(text)
 
-    analyzed = BonAnalyzer().analyze(parsed)
+    analyzer = BonAnalyzer()
+    analyzer.analyze(parsed)
 
-    errors = MilliValidator().validate(analyzed)
+    errors = MilliValidator().validate(analyzer.get_functions(), analyzer.classes)
     if errors:
         print("Found errors:")
         for err in errors:
             print("-", err)
         return
 
-    enriched_result = translate(analyzed, with_debug=True)
+    enriched_result = translate(analyzer.get_functions(), analyzer.classes, with_debug=True)
     run_debugger(enriched_result, lines)
 
 

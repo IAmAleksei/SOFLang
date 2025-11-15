@@ -14,13 +14,13 @@ class TestAnalyzer(unittest.TestCase):
         analyzer = BonAnalyzer()
         functions = analyzer.analyze(parsed)
         validator = MilliValidator()
-        errors = validator.validate(functions)
+        errors = validator.validate(functions, analyzer.classes)
         return errors
     
     def test_valid_program(self):
         """Test that a valid program produces no errors."""
         code = """
-        num factorial(num n) {
+        Num factorial(Num n) {
             result = 1
         }
         """
@@ -30,7 +30,7 @@ class TestAnalyzer(unittest.TestCase):
     def test_undefined_variable(self):
         """Test detection of undefined variable."""
         code = """
-        num test() {
+        Num test() {
             x = 1
         }
         """
@@ -42,7 +42,7 @@ class TestAnalyzer(unittest.TestCase):
     def test_undefined_function(self):
         """Test detection of undefined function call."""
         code = """
-        num test() {
+        Num test() {
             result = foo()
         }
         """
@@ -54,8 +54,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_variable_defined_before_use(self):
         """Test that variables can be used after declaration."""
         code = """
-        num test() {
-            num x
+        Num test() {
+            Num x
             x = 1
             result = x
         }
@@ -68,7 +68,7 @@ class TestAnalyzer(unittest.TestCase):
     def test_function_parameters_in_scope(self):
         """Test that function parameters are in scope."""
         code = """
-        num test(num x) {
+        Num test(Num x) {
             result = x
         }
         """
@@ -79,10 +79,10 @@ class TestAnalyzer(unittest.TestCase):
     def test_valid_function_call(self):
         """Test that valid function calls work."""
         code = """
-        num helper() {
+        Num helper() {
             result = 42
         }
-        num test() {
+        Num test() {
             result = helper()
         }
         """
@@ -93,12 +93,12 @@ class TestAnalyzer(unittest.TestCase):
     def test_function_call_with_arguments(self):
         """Test function calls with arguments."""
         code = """
-        num add(num a, num b) {
+        Num add(Num a, Num b) {
             result = a + b
         }
-        num test() {
-            num x
-            num y
+        Num test() {
+            Num x
+            Num y
             result = add(x, y)
         }
         """
@@ -111,8 +111,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_nested_control_flow(self):
         """Test variables in nested control flow."""
         code = """
-        num test(num n) {
-            n ?. {
+        Num test(Num n) {
+            n ...? {
                 temp = n
             }
             result = n
@@ -127,10 +127,10 @@ class TestAnalyzer(unittest.TestCase):
     def test_multiple_functions(self):
         """Test programs with multiple functions."""
         code = """
-        num first() {
+        Num first() {
             result = 1
         }
-        num second() {
+        Num second() {
             result = first()
         }
         """
@@ -139,23 +139,23 @@ class TestAnalyzer(unittest.TestCase):
         self.assertEqual(len(undefined_func_errors), 0, f"Function first should be defined: {errors}")
     
     def test_array_type_declaration(self):
-        """Test that assigning array to result in num function produces an error."""
+        """Test that assigning array to result in Num function produces an error."""
         code = """
-        num test() {
-            num*10 arr
+        Num test() {
+            Num*10 arr
             result = arr
         }
         """
         errors = self._analyze_and_validate(code)
-        # Should have type mismatch error - function returns num but arr is an array
+        # Should have type mismatch error - function returns Num but arr is an array
         type_errors = [e for e in errors if isinstance(e, TypeMismatchError)]
         self.assertGreater(len(type_errors), 0, f"Should have type mismatch error for assigning array to num result: {errors}")
     
     def test_while_loop_variable(self):
         """Test variable usage in while loops."""
         code = """
-        num test(num n) {
-            n ?. {
+        Num test(Num n) {
+            n ...? {
                 n = n - 1
             }
             result = n
@@ -168,7 +168,7 @@ class TestAnalyzer(unittest.TestCase):
     def test_if_expression_variable(self):
         """Test variable usage in if expressions."""
         code = """
-        num test(num x) {
+        Num test(Num x) {
             x ?? {
                 y = 1
             }
@@ -184,8 +184,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_array_element_read(self):
         """Test reading array elements."""
         code = """
-        num test() {
-            num*10 arr
+        Num test() {
+            Num*10 arr
             result = arr[0]
         }
         """
@@ -197,8 +197,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_array_element_write(self):
         """Test writing to array elements."""
         code = """
-        num test() {
-            num*10 arr
+        Num test() {
+            Num*10 arr
             arr[0] = 42
             result = arr[0]
         }
@@ -211,8 +211,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_array_index_with_variable(self):
         """Test array indexing with variable index."""
         code = """
-        num test(num i) {
-            num*10 arr
+        Num test(Num i) {
+            Num*10 arr
             arr[i] = 5
             result = arr[i]
         }
@@ -225,8 +225,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_array_index_on_non_array(self):
         """Test that indexing non-array variables produces an error."""
         code = """
-        num test() {
-            num x
+        Num test() {
+            Num x
             x[0] = 5
             result = x[0]
         }
@@ -239,21 +239,21 @@ class TestAnalyzer(unittest.TestCase):
     def test_array_index_with_array_variable(self):
         """Test that using an array variable as index produces an error."""
         code = """
-        num test() {
-            num*10 arr
-            num*5 idx
+        Num test() {
+            Num*10 arr
+            Num*5 idx
             result = arr[idx]
         }
         """
         errors = self._analyze_and_validate(code)
-        # Should have type mismatch error - index must be num, not array
-        type_errors = [e for e in errors if isinstance(e, TypeMismatchError) and "array index must be num variable" in str(e)]
+        # Should have type mismatch error - index must be Num, not array
+        type_errors = [e for e in errors if isinstance(e, TypeMismatchError) and "array index must be Num variable" in str(e)]
         self.assertGreater(len(type_errors), 0, f"Should have type mismatch error for array index: {errors}")
     
     def test_result_auto_declared(self):
         """Test that result variable is automatically declared."""
         code = """
-        num test() {
+        Num test() {
             result = 42
         }
         """
@@ -265,8 +265,8 @@ class TestAnalyzer(unittest.TestCase):
     def test_result_cannot_be_redeclared(self):
         """Test that result variable cannot be declared."""
         code = """
-        num test() {
-            num result
+        Num test() {
+            Num result
         }
         """
         errors = self._analyze_and_validate(code)
@@ -277,21 +277,21 @@ class TestAnalyzer(unittest.TestCase):
     def test_result_type_mismatch(self):
         """Test that assigning wrong type to result produces error."""
         code = """
-        num test() {
-            num*10 arr
+        Num test() {
+            Num*10 arr
             result = arr
         }
         """
         errors = self._analyze_and_validate(code)
-        # Should have type mismatch error
-        type_errors = [e for e in errors if isinstance(e, TypeMismatchError) and "return type mismatch" in str(e)]
+        # Should have type mismatch error (either class type or array size mismatch)
+        type_errors = [e for e in errors if isinstance(e, TypeMismatchError) and ("return" in str(e) or "result" in str(e))]
         self.assertGreater(len(type_errors), 0, f"Should have type mismatch error for result assignment: {errors}")
     
     def test_result_with_array_return_type(self):
         """Test that result works with array return types."""
         code = """
-        num*10 test() {
-            num*10 arr
+        Num*10 test() {
+            Num*10 arr
             result = arr
         }
         """

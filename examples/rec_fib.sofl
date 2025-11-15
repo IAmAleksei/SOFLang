@@ -1,7 +1,7 @@
-num recfib(num n) {
-    num iszero
+Num recfib(Num n) {
+    Num iszero
     iszero = ~n
-    num isone
+    Num isone
     isone = n - 1
     isone = ~isone
     isone ?? {
@@ -9,17 +9,17 @@ num recfib(num n) {
     }
     ~isone ?? {
         ~iszero ?? {
-            num a
+            Num a
             a = n - 2
-            num b
+            Num b
             b = n - 1
             result = recfib(a) + recfib(b)
         }
     }
 }
 
-num main() {
-    num n
+Num main() {
+    Num n
     n = 6
     result = recfib(n)
     result = result + 48

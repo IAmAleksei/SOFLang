@@ -1,12 +1,12 @@
-num main() {
-    num n
-    num a
-    num b
+Num main() {
+    Num n
+    Num a
+    Num b
     n = 6
     a = 0
     b = 1
-    n ?. {
-        num tmp
+    n ...? {
+        Num tmp
         tmp = a
         a = b
         b = b + tmp
