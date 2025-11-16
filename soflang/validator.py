@@ -3,7 +3,7 @@ from soflang.analyzer import (
     Function, Variable, Class,
     AnalysisError, UndefinedVariableError, UndefinedFunctionError,
     TypeMismatchError, ArgumentCountError,
-    Statement, VariableDeclaration, Assignment,
+    Statement, VariableDeclaration, VarDeclWithAssign, Assignment,
     IfExpression, WhileExpression,
     Atom, GeneralExpr, UnaryExpr, IntegerLiteral, IdentifierExpr, FunctionCall, ArrayIndex,
     FieldAccess, ConstructorCall, Throwable
@@ -68,6 +68,8 @@ class MilliValidator:
                     ))
                 else:
                     variables[var.name] = var
+            elif isinstance(stmt, VarDeclWithAssign):
+                self._analyze_var_decl_with_assign(stmt, variables, func)
             elif isinstance(stmt, Assignment):
                 self._analyze_assignment(stmt, variables, func)
             elif isinstance(stmt, IfExpression):
@@ -76,6 +78,36 @@ class MilliValidator:
                 self._analyze_while_expr(stmt, variables, func)
             elif isinstance(stmt, Throwable):
                 pass
+    
+    def _analyze_var_decl_with_assign(self, stmt: VarDeclWithAssign, variables: Dict[str, Variable], func: Function):
+        """Analyze var-decl-with-assign. Enriches stmt with inferred type when 'auto'.
+        Fails if inference is not possible or unexpected input appears."""
+        name = stmt.name
+        if not isinstance(name, str) or not name:
+            self.errors.append(TypeMismatchError("valid identifier", "invalid", f"invalid variable name in function {func.name}"))
+            return
+        if name == 'result':
+            self.errors.append(TypeMismatchError(
+                "cannot declare", "result",
+                f"variable 'result' cannot be declared in function {func.name}"
+            ))
+            return
+        # Validate and infer expression type
+        expr_class_type, expr_array_size = self._analyze_expression(stmt.value, variables, func.name)
+        if expr_class_type is None:
+            # Could not infer or invalid expression
+            self.errors.append(TypeMismatchError("inferred type", "unknown", f"cannot infer type for {name} in function {func.name}"))
+            return
+        if stmt.class_type is None:
+            # Auto: enrich the AST node with inferred type and declare variable
+            stmt.class_type = expr_class_type
+            stmt.array_size = expr_array_size
+            variables[name] = Variable(name, stmt.class_type, stmt.array_size)
+        else:
+            # Explicit type: declare and then validate compatibility with RHS
+            variables[name] = Variable(name, stmt.class_type, stmt.array_size)
+            # Now check assignment rules using same path as simple assignment
+            self._analyze_simple_assignment(name, stmt.value, variables, func)
     
     def _analyze_assignment(self, assignment: Assignment, 
                            variables: Dict[str, Variable], func: Function):

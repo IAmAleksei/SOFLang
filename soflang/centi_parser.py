@@ -5,7 +5,7 @@ ParserElement.setDefaultWhitespaceChars(' \t')
 
 LPAR, RPAR, LBRACK, RBRACK, LBRACE, RBRACE, COLON, SEMI, COMMA, LN, EQ, SHARP = map(Suppress, "()[]{}:;,\n=#")
 
-IF, WHILE = map(Keyword, "?? ...?".split())
+IF, WHILE, AUTO = map(Keyword, "?? ...? auto".split())
 
 
 class Parser:
@@ -129,6 +129,21 @@ class Parser:
             'line': self.get_line(start_symbol)
         }
 
+    def enrich_var_decl_with_assign(self, tokens):
+        start_symbol = tokens[0].locn_start
+        data = tokens[0].get('value')
+        right = data.get('value')[0]
+        type_info = data.get('type')[0]
+        var_name = data.get('var_name').get('value')
+
+        return {
+            'kind': type_info,
+            'type': 'var_decl_with_assign',
+            'identifier': var_name,
+            'value': right,
+            'line': self.get_line(start_symbol)
+        }
+
     def enrich_if_expr(self, tokens):
         start_symbol = tokens[0].locn_start
         data = tokens[0].get('value')
@@ -240,6 +255,8 @@ class Parser:
         gen_expr = expr | unary_expr | atom
         assignment = locatedExpr(Group((array_index | identifier) + EQ + gen_expr))
         assignment.setParseAction(self.enrich_assignment)
+        var_decl_with_assign = locatedExpr(Group((TYPE | AUTO)("type") + identifier("var_name") + EQ + gen_expr('value')))
+        var_decl_with_assign.setParseAction(self.enrich_var_decl_with_assign)
         infunc_exprs = ZeroOrMore(Group(line_expr) + OneOrMore(LN))
         if_expr = locatedExpr(Group(gen_expr + IF + LBRACE + LN + infunc_exprs + RBRACE))
         if_expr.setParseAction(self.enrich_if_expr)
@@ -247,7 +264,7 @@ class Parser:
         while_expr.setParseAction(self.enrich_while_expr)
         error_expr = locatedExpr(Group(Keyword("error")))
         error_expr.setParseAction(lambda x: {'type': 'throw_error', 'line': self.get_line(x[0].locn_start)})
-        line_expr <<= (assignment | if_expr | var_decl | while_expr | error_expr)
+        line_expr <<= (assignment | if_expr | var_decl_with_assign | var_decl | while_expr | error_expr)
         line_expr.setParseAction(self.enrich_line_expr)
         func_decl = Group(TYPE("return_type") + identifier("func_name") + LPAR + Optional(delimitedList(var_decl))("parameters") + RPAR + LBRACE + LN + Group(ZeroOrMore(Group(line_expr) + LN))("statements") + RBRACE)
         func_decl.setParseAction(self.enrich_func_decl)

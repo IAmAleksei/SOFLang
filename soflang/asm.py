@@ -6,7 +6,7 @@ from soflang.analyzer import (
     Statement, VariableDeclaration, Assignment,
     IfExpression, WhileExpression,
     Atom, GeneralExpr, IntegerLiteral, IdentifierExpr, FunctionCall, ArrayIndex, UnaryExpr, Class, FieldAccess,
-    ConstructorCall, Throwable
+    ConstructorCall, Throwable, VarDeclWithAssign
 )
 from soflang.asm_ops import *
 
@@ -15,7 +15,7 @@ from soflang.asm_ops import *
 class TranslationResult:
     asm_instructions: List[Instruction]
     source_code_lines: List[int]
-    variable_allocations: Dict[int, str]
+    variable_allocations: Dict[int, tuple[str, int]]
 
 
 def translate(functions: List[Function], classes: Dict[str, Class], with_debug: bool = False) -> TranslationResult:
@@ -29,8 +29,8 @@ def translate(functions: List[Function], classes: Dict[str, Class], with_debug: 
         result.asm_instructions.extend(subtranslator.result)
         if with_debug:
             result.source_code_lines.extend(subtranslator.source_code_lines)
-            for idx, name in subtranslator.variable_allocations.items():
-                result.variable_allocations[idx + instr_shift] = name
+            for idx, info in subtranslator.variable_allocations.items():
+                result.variable_allocations[idx + instr_shift] = info
 
     run_translation('main', 0)
     for func in functions:
@@ -58,7 +58,7 @@ class SingleFunctionTinyTranslator:
         self.cached_class_sizes: Dict[str, int] = {'Num': 1}
         self.cur_line = -1
         self.source_code_lines: List[int] = []
-        self.variable_allocations: Dict[int, str] = {}
+        self.variable_allocations: Dict[int, tuple[str, int]] = {}
 
     def calculate_space(self, str_type, array_size: Optional[int] = None):
         """Calculate space needed for a type. Returns 1 for simple types, array_size for arrays."""
@@ -76,7 +76,7 @@ class SingleFunctionTinyTranslator:
 
     def calc_and_alloc(self, name, str_type, array_size):
         space = self.calculate_space(str_type, array_size)
-        self.variable_allocations[len(self.result)] = name
+        self.variable_allocations[len(self.result)] = (name, space)
         self.save_instr(AllocI(space))
         self.stack_pos += space
         return space
@@ -119,8 +119,10 @@ class SingleFunctionTinyTranslator:
             self.save_instr(Error())
             self.stack_pos += 1
             allocated_stack = 0
-            for param in atom.value.parameters:
-                allocated_stack += self._load_var_on_stack(param)
+            for param, var_name in zip(called_func.parameters, atom.value.parameters):
+                sz = self._load_var_on_stack(var_name)
+                allocated_stack += sz
+                self.variable_allocations[len(self.result) - 1] = (param.name, sz)
             self.save_instr(TempJumpAI(called_func.name))
             after_jump_pos = len(self.result)
             self.result[dump_pos] = DumpI(after_jump_pos - dump_pos)
@@ -247,6 +249,16 @@ class SingleFunctionTinyTranslator:
                 self.result[jump_pos] = Jump0I(after_body_and_jump_pos - jump_pos)
             elif isinstance(line, Throwable):
                 self.save_instr(CrashI())
+            elif isinstance(line, VarDeclWithAssign):
+                assert line.class_type is not None
+                self._parse_expr(line.value)
+                var = line
+                space = self.calculate_space(var.class_type, var.array_size)
+                self.var_stack_positions[var.name] = self.stack_pos - space + 1
+                self.var_stack_sizes[var.name] = space
+                self.var_classes[var.name] = var.class_type
+                self.variable_allocations[len(self.result) - 1] = (var.name, space)
+                local_vars.append(var.name)
             else:
                 raise ValueError()
 

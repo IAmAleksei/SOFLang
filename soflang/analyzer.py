@@ -96,6 +96,17 @@ class VariableDeclaration:
 
 
 @dataclass
+class VarDeclWithAssign:
+    """Represents a merged variable declaration with assignment.
+    If class_type is None, it means 'auto' and should be inferred from value."""
+    name: str
+    value: Union[Atom, GeneralExpr, UnaryExpr]
+    class_type: Optional[str] = None
+    array_size: Optional[int] = None
+    line: Optional[int] = None
+
+
+@dataclass
 class Assignment:
     """Represents an assignment statement."""
     target: Union[str, ArrayIndex]
@@ -125,7 +136,7 @@ class Throwable:
 
 
 # Type alias for Statement
-Statement = Union[VariableDeclaration, Assignment, IfExpression, WhileExpression | Throwable]
+Statement = Union[VariableDeclaration, VarDeclWithAssign, Assignment, IfExpression, WhileExpression | Throwable]
 
 
 @dataclass
@@ -219,6 +230,9 @@ class BonAnalyzer:
         for decl in parsed_program:
             if isinstance(decl, dict) and decl.get('type') == 'func_decl':
                 self._process_function_declaration(decl)
+        
+        # Return list of functions for callers/tests expecting a return value
+        return list(self.functions.values())
 
     def _process_function_declaration(self, func_decl: Dict):
         """Process a function declaration to extract its signature and body."""
@@ -328,7 +342,6 @@ class BonAnalyzer:
         for line_expr in body_raw:
             if not isinstance(line_expr, dict):
                 continue
-            
             statement = self._parse_statement(line_expr)
             if statement:
                 statements.append(statement)
@@ -343,6 +356,32 @@ class BonAnalyzer:
             var = self._parse_variable_decl(stmt_dict)
             if var:
                 return VariableDeclaration(var, stmt_dict.get('line'))
+        elif stmt_type == 'var_decl_with_assign':
+            # Build dedicated node
+            var_name_obj = stmt_dict.get('identifier')
+            kind = stmt_dict.get('kind')
+            var_name = self._get_identifier_value(var_name_obj)
+            if not var_name:
+                return None
+            value_obj = stmt_dict.get('value')
+            expr = self._parse_expression(value_obj)
+            if expr is None:
+                return None
+            declared_class_type: Optional[str] = None
+            declared_array_size: Optional[int] = None
+            # If kind is dict -> explicit type; if 'auto' or missing -> leave None for validator inference
+            if isinstance(kind, dict):
+                declared_class_type, declared_array_size = self._parse_type(kind)
+            elif isinstance(kind, str) and kind.lower() != 'auto':
+                declared_class_type = kind
+                declared_array_size = None
+            return VarDeclWithAssign(
+                name=var_name,
+                value=expr,
+                class_type=declared_class_type,
+                array_size=declared_array_size,
+                line=stmt_dict.get('line')
+            )
         elif stmt_type == 'assignment':
             assignment = self._parse_assignment(stmt_dict)
             if assignment:

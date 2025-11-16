@@ -1,13 +1,11 @@
 Num main() {
     Num n
     Num a
-    Num b
+    Num b = 1
     n = 6
     a = 0
-    b = 1
     n ...? {
-        Num tmp
-        tmp = a
+        auto tmp = a
         a = b
         b = b + tmp
         n = n - 1

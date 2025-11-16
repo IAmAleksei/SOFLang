@@ -42,13 +42,12 @@ class Debugger:
         if not isinstance(i, ExitI):
             self.history.append(self.ec.copy())
             i.apply(self.ec)
-            if isinstance(i, AllocI):
-                assert cur_ip in self.debug_info.variable_allocations
+            if cur_ip in self.debug_info.variable_allocations:
+                var_name, var_size = self.debug_info.variable_allocations[cur_ip]
                 self.vars.append(
-                    VarDebugInfo(self.debug_info.variable_allocations[cur_ip], self.ec.sp - i.size + 1, i.size)
+                    VarDebugInfo(var_name, self.ec.sp - var_size + 1, var_size)
                 )
-            elif isinstance(i, PopI):
-                # TODO: it loses variables because of after-func parameters popping
+            if isinstance(i, PopI):
                 self.vars.pop()
             self.cur_line = self.debug_info.source_code_lines[self.ec.ip]
         else:
@@ -56,10 +55,10 @@ class Debugger:
 
     def print_state(self):
         stack_end = self.ec.sp + 1
-        stack_start = stack_end - 40
+        stack_start = max(stack_end - 40, 0)
         print()
         print(f"-----------------------------------------------------------{stack_end}")
-        print(f"| {' '.join(map(str, self.ec.stack[stack_start:stack_end:][::-1]))}")
+        print(f"| {' '.join(map(str, self.ec.stack[stack_start:stack_end][::-1]))}")
         print("--------------------------------------------------------------")
         if self.cur_line >= 0:
             code_line = self.source_code[self.cur_line].strip()
@@ -81,12 +80,19 @@ class Debugger:
 def run_debugger(compiled_code_with_debug_info: TranslationResult, source_code: list[str]):
     debugger = Debugger(compiled_code_with_debug_info, source_code)
     debugger.print_state()
-    while True:
-        i = input()
-        if i == "":
-            debugger.forward()
-        elif i == "l":
-            prev_line = debugger.cur_line
-            while debugger.cur_line == prev_line:
+    try:
+        while True:
+            i = input()
+            if i == "":
                 debugger.forward()
+            elif i == "l":
+                prev_line = debugger.cur_line
+                while debugger.cur_line == prev_line:
+                    debugger.forward()
+            elif i == "f":
+                while True:
+                    debugger.forward()
+            debugger.print_state()
+    except ValueError:
+        print("Finished")
         debugger.print_state()

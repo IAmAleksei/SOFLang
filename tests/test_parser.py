@@ -11,7 +11,7 @@ class TestParser(unittest.TestCase):
         code = """
         num factorial(num n) {
             result = 1
-            n ?. {
+            n ...? {
                 result = result * n
                 n = n - 1
             }
@@ -56,10 +56,10 @@ class TestParser(unittest.TestCase):
         code = """
         num factorial(num n) {
             result = 1
-            n ?. {
+            n ...? {
                 num temp
                 temp = n
-                temp ?. {
+                temp ...? {
                     result = result * temp
                     temp = temp - 1
                 }
@@ -122,7 +122,7 @@ class TestParser(unittest.TestCase):
 
     def test_while_loop_standalone(self):
         """Test standalone while loops"""
-        code = """x ?. {
+        code = """x ...? {
     y = y + 1
 }"""
         try:
@@ -331,7 +331,7 @@ class TestParser(unittest.TestCase):
                 result = result + temp
                 temp = temp - 1
             }
-            temp ?. {
+            temp ...? {
                 result = result * b
                 b = b - 1
             }
