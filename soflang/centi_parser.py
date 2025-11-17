@@ -5,7 +5,7 @@ ParserElement.setDefaultWhitespaceChars(' \t')
 
 LPAR, RPAR, LBRACK, RBRACK, LBRACE, RBRACE, COLON, SEMI, COMMA, LN, EQ, SHARP = map(Suppress, "()[]{}:;,\n=#")
 
-IF, WHILE, AUTO = map(Keyword, "?? ...? auto".split())
+IF, WHILE, AUTO, LOAD = map(Keyword, "?? ...? auto load".split())
 
 
 class Parser:
@@ -217,11 +217,22 @@ class Parser:
             'types': types
         }
 
+    def enrich_import_decl(self, tokens):
+        inner = tokens[0]
+
+        library_name = inner.get('library_name')
+
+        return {
+            'type': 'import_decl',
+            'identifier': library_name
+        }
+
     def enrich_global_expr(self, tokens):
         funcs_and_clazzes = [item for item in tokens]
         return funcs_and_clazzes
 
     def parse_program(self, text) -> list:
+        library_name = Regex(r'(@/)?[a-z0-9]+(/[a-z0-9]+)*')
         integer = Regex(r'[+-]?\d+')
         clazz = Word(string.ascii_uppercase, string.ascii_lowercase)
         clazz.setParseAction(self.make_identifier)
@@ -255,7 +266,8 @@ class Parser:
         gen_expr = expr | unary_expr | atom
         assignment = locatedExpr(Group((array_index | identifier) + EQ + gen_expr))
         assignment.setParseAction(self.enrich_assignment)
-        var_decl_with_assign = locatedExpr(Group((TYPE | AUTO)("type") + identifier("var_name") + EQ + gen_expr('value')))
+        var_decl_with_assign = locatedExpr(
+            Group((TYPE | AUTO)("type") + identifier("var_name") + EQ + gen_expr('value')))
         var_decl_with_assign.setParseAction(self.enrich_var_decl_with_assign)
         infunc_exprs = ZeroOrMore(Group(line_expr) + OneOrMore(LN))
         if_expr = locatedExpr(Group(gen_expr + IF + LBRACE + LN + infunc_exprs + RBRACE))
@@ -266,23 +278,30 @@ class Parser:
         error_expr.setParseAction(lambda x: {'type': 'throw_error', 'line': self.get_line(x[0].locn_start)})
         line_expr <<= (assignment | if_expr | var_decl_with_assign | var_decl | while_expr | error_expr)
         line_expr.setParseAction(self.enrich_line_expr)
-        func_decl = Group(TYPE("return_type") + identifier("func_name") + LPAR + Optional(delimitedList(var_decl))("parameters") + RPAR + LBRACE + LN + Group(ZeroOrMore(Group(line_expr) + LN))("statements") + RBRACE)
+        func_decl = Group(TYPE("return_type") + identifier("func_name") + LPAR + Optional(delimitedList(var_decl))(
+            "parameters") + RPAR + LBRACE + LN + Group(ZeroOrMore(Group(line_expr) + LN))("statements") + RBRACE)
         func_decl.setParseAction(self.enrich_func_decl)
         field_decl = Group(identifier("field_name") + SHARP + TYPE("type"))
         field_decl.setParseAction(self.enrich_field_decl)
         clazz_decl = Group(clazz("clazz_name") + COLON + delimitedList(field_decl, delim='x')("types"))
         clazz_decl.setParseAction(self.enrich_clazz_decl)
-        global_expr = ZeroOrMore(LN) + ZeroOrMore((func_decl | clazz_decl) + OneOrMore(LN))
+        import_decl = Group(LOAD + library_name("library_name"))
+        import_decl.setParseAction(self.enrich_import_decl)
+        global_expr = ZeroOrMore(LN) + ZeroOrMore((import_decl | func_decl | clazz_decl) + OneOrMore(LN))
         global_expr.setParseAction(self.enrich_global_expr)
         self.text = text
         return list(global_expr.parse_string(self.text, parse_all=True))
+
+
 # TODO: arrays with variable size.
 # TODO: support templates.
+# TODO: support comments
 
 
 def parse_program(text: str) -> list:
     """Convenience function to parse a program."""
     return Parser().parse_program(text)
+
 
 if __name__ == '__main__':
     result = Parser().parse_program("""

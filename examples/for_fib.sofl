@@ -1,3 +1,5 @@
+load dict
+
 Num main() {
     Num n
     Num a

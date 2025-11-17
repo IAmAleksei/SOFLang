@@ -9,6 +9,7 @@ from soflang.asm import (
 from soflang.binarify import decode_binary_asm, encode_binary_asm
 from soflang.debugger import run_debugger
 from soflang.lvm import LionVM
+from soflang.preprocess import recursive_parse
 from soflang.validator import MilliValidator
 
 
@@ -70,9 +71,7 @@ from soflang.validator import MilliValidator
 
 
 def compile_and_run(ifile):
-    with open(ifile, 'r') as f:
-        text = "".join(f.readlines())
-    parsed = centi_parser.Parser().parse_program(text)
+    parsed = recursive_parse(ifile)
 
     analyzer = BonAnalyzer()
     analyzer.analyze(parsed)
