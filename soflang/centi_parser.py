@@ -269,6 +269,7 @@ class Parser:
         var_decl_with_assign = locatedExpr(
             Group((TYPE | AUTO)("type") + identifier("var_name") + EQ + gen_expr('value')))
         var_decl_with_assign.setParseAction(self.enrich_var_decl_with_assign)
+        comment_expr = Suppress(Regex("//[^\n]*"))
         infunc_exprs = ZeroOrMore(Group(line_expr) + OneOrMore(LN))
         if_expr = locatedExpr(Group(gen_expr + IF + LBRACE + LN + infunc_exprs + RBRACE))
         if_expr.setParseAction(self.enrich_if_expr)
@@ -276,7 +277,7 @@ class Parser:
         while_expr.setParseAction(self.enrich_while_expr)
         error_expr = locatedExpr(Group(Keyword("error")))
         error_expr.setParseAction(lambda x: {'type': 'throw_error', 'line': self.get_line(x[0].locn_start)})
-        line_expr <<= (assignment | if_expr | var_decl_with_assign | var_decl | while_expr | error_expr)
+        line_expr <<= (assignment | if_expr | var_decl_with_assign | var_decl | while_expr | error_expr | comment_expr)
         line_expr.setParseAction(self.enrich_line_expr)
         func_decl = Group(TYPE("return_type") + identifier("func_name") + LPAR + Optional(delimitedList(var_decl))(
             "parameters") + RPAR + LBRACE + LN + Group(ZeroOrMore(Group(line_expr) + LN))("statements") + RBRACE)
@@ -287,7 +288,7 @@ class Parser:
         clazz_decl.setParseAction(self.enrich_clazz_decl)
         import_decl = Group(LOAD + library_name("library_name"))
         import_decl.setParseAction(self.enrich_import_decl)
-        global_expr = ZeroOrMore(LN) + ZeroOrMore((import_decl | func_decl | clazz_decl) + OneOrMore(LN))
+        global_expr = ZeroOrMore(LN) + ZeroOrMore((import_decl | func_decl | clazz_decl | comment_expr) + OneOrMore(LN))
         global_expr.setParseAction(self.enrich_global_expr)
         self.text = text
         return list(global_expr.parse_string(self.text, parse_all=True))
@@ -305,27 +306,27 @@ def parse_program(text: str) -> list:
 
 if __name__ == '__main__':
     result = Parser().parse_program("""
-    num factorial(num n, num i) {
-        num*100 tmp
+    Num factorial(Num n, Num i) {
+        Num*100 tmp
         n ?? {
             n = n + 0
         }
         tmp[0] = tmp[1]
         result = 1
-        n ?. {
+        n ...? {
             result = result * n
             n = n - 1
         }
     }
-    num main() {
-        num a
+    Num main() {
+        Num a
         a = 5
         result = factorial(a, b)
     }
     """)
 
     result = Parser().parse_program("""
-    num main() {
+    Num main() {
         result = 54
     }
     """)

@@ -8,7 +8,7 @@ Dict add_to_dict(Dict cur, Num k, Num v) {
     ~limit ?? {
         error
     }
-    Pair*10 items = cur#items
+    auto items = cur#items
     items[size] = Pair(k, v)
     result = Dict(items, newsize)
 }

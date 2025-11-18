@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from soflang import centi_parser
+from soflang import centi_parser, preprocess
 from soflang.analyzer import BonAnalyzer, Function
 from soflang.asm import (
     parse_asm, translate,
@@ -89,10 +89,7 @@ def compile_and_run(ifile):
 
 
 def compile_and_debug(ifile):
-    with open(ifile, 'r') as f:
-        lines = f.readlines()
-    text = "".join(lines)
-    parsed = centi_parser.Parser().parse_program(text)
+    parsed, text = preprocess.parse_with_imports_resolution(ifile)
 
     analyzer = BonAnalyzer()
     analyzer.analyze(parsed)
@@ -105,7 +102,7 @@ def compile_and_debug(ifile):
         return
 
     enriched_result = translate(analyzer.get_functions(), analyzer.classes, with_debug=True)
-    run_debugger(enriched_result, lines)
+    run_debugger(enriched_result, text.split('\n'))
 
 
 def main():

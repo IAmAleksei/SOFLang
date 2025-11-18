@@ -1,9 +1,8 @@
-# TODO: fix debugger to show correct lines
-
 from pathlib import Path
 from typing import List, Set
 
 from soflang.centi_parser import Parser
+from soflang.formatter import Formatter
 
 
 def recursive_parse(filepath: str) -> list:
@@ -34,3 +33,9 @@ def recursive_parse(filepath: str) -> list:
             else:
                 result.append(global_expr)
     return result
+
+
+def parse_with_imports_resolution(filepath: str) -> tuple[list, str]:
+    parsed_text = recursive_parse(filepath)
+    formatted_text = Formatter().format(parsed_text)
+    return Parser().parse_program(formatted_text), formatted_text
