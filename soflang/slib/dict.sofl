@@ -4,8 +4,8 @@ Dict: items#Pair*10 x size#Num
 Dict add_to_dict(Dict cur, Num k, Num v) {
     Num size = cur#size
     Num newsize = size + 1
-    Num limit = 11 - newsize
-    ~limit ?? {
+    Num limit = newsize ~ 11
+    limit ?? {
         error
     }
     auto items = cur#items
@@ -19,8 +19,8 @@ Num get_from_dict(Dict cur, Num k) {
     i ...? {
         Num j = i - 1
         Pair p = items[j]
-        Num check = p#key - k
-        ~check ?? {
+        Num check = p#key ~ k
+        check ?? {
             result = p#value
         }
         i = i - 1

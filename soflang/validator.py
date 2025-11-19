@@ -323,12 +323,33 @@ class MilliValidator:
         if param_count != len(func_def.parameters):
             self.errors.append(ArgumentCountError(call_name, len(func_def.parameters), param_count))
         
-        # Check that all parameters are valid variables
-        for param_name in func_call.parameters:
-            if param_name not in variables:
-                self.errors.append(UndefinedVariableError(
-                    param_name, f"as argument to {call_name} in function {func_name}"
-                ))
+        # Analyze each parameter atom and check type compatibility
+        for i, param_atom in enumerate(func_call.parameters):
+            param_type, param_array_size = self._analyze_atom(param_atom, variables, func_name)
+            
+            if param_type is None:
+                # Error already reported by _analyze_atom
+                continue
+            
+            # Check if we have a corresponding function parameter (may not exist if count mismatch)
+            if i < len(func_def.parameters):
+                expected_param = func_def.parameters[i]
+                
+                # Check class type compatibility
+                if param_type != expected_param.class_type:
+                    self.errors.append(TypeMismatchError(
+                        expected_param.class_type, param_type,
+                        f"parameter {i+1} to {call_name} in function {func_name}"
+                    ))
+                
+                # Check array size compatibility
+                if param_array_size != expected_param.array_size:
+                    if param_array_size is not None or expected_param.array_size is not None:
+                        self.errors.append(TypeMismatchError(
+                            f"{expected_param.class_type}{'*' + str(expected_param.array_size) if expected_param.array_size else ''}",
+                            f"{param_type}{'*' + str(param_array_size) if param_array_size else ''}",
+                            f"parameter {i+1} array size mismatch to {call_name} in function {func_name}"
+                        ))
         
         return func_def.return_class_type, func_def.return_array_size
     

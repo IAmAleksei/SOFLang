@@ -42,7 +42,7 @@ class IdentifierExpr:
 class FunctionCall:
     """Represents a function call."""
     name: str
-    parameters: List[str]  # List of variable names
+    parameters: List['Atom']  # List of atom values (can be identifiers, integers, function calls, etc.)
 
 
 @dataclass
@@ -563,7 +563,7 @@ class BonAnalyzer:
         return ConstructorCall(class_name, parameters)
     
     def _parse_function_call(self, func_call_dict: Dict) -> Optional[FunctionCall]:
-        """Parse FUNCTION_CALL: {'type': 'func_call', 'identifier': IDENTIFIER_STR, 'parameters': list of IDENTIFIERs}"""
+        """Parse FUNCTION_CALL: {'type': 'func_call', 'identifier': IDENTIFIER_STR, 'parameters': list of ATOMs}"""
         func_name_obj = func_call_dict.get('identifier')
         func_name = self._get_identifier_value(func_name_obj)
         
@@ -573,9 +573,9 @@ class BonAnalyzer:
         parameters_raw = func_call_dict.get('parameters', [])
         parameters = []
         for param_obj in parameters_raw:
-            param_name = self._get_identifier_value(param_obj)
-            if param_name:
-                parameters.append(param_name)
+            param_atom = self._parse_atom(param_obj)
+            if param_atom:
+                parameters.append(param_atom)
         
         return FunctionCall(func_name, parameters)
     

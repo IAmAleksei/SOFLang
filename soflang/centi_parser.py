@@ -248,8 +248,7 @@ class Parser:
         var_decl.setParseAction(self.enrich_var_decl)
         line_expr = Forward()
         # TODO: allow consts and exprs as a parameters.
-        function_call = Group(identifier("func_name") + LPAR + Optional(delimitedList(identifier))("parameters") + RPAR)
-        function_call.setParseAction(self.enrich_function_call)
+        function_call = Forward()
         constructor_call = Group(clazz("clazz_name") + LPAR + Optional(delimitedList(identifier))("parameters") + RPAR)
         constructor_call.setParseAction(self.enrich_constructor_call)
         array_index = Group(identifier + LBRACK + (integer | identifier) + RBRACK)
@@ -259,11 +258,13 @@ class Parser:
         # Allow this in function call
         atom = integer | function_call | constructor_call | array_index | field_access | identifier
         atom.setParseAction(self.make_atom)
-        expr = Group(atom + oneOf("* / + -") + atom)
+        function_call <<= Group(identifier("func_name") + LPAR + Optional(delimitedList(atom))("parameters") + RPAR)
+        function_call.setParseAction(self.enrich_function_call)
+        expr = Group(atom + oneOf("* / + - ~") + atom)
         expr.setParseAction(self.enrich_binary_expr)
-        unary_expr = Group(oneOf("~") + atom)
-        unary_expr.setParseAction(self.enrich_unary_expr)
-        gen_expr = expr | unary_expr | atom
+        # unary_expr = Group(oneOf("~") + atom)
+        # unary_expr.setParseAction(self.enrich_unary_expr)
+        gen_expr = expr | atom
         assignment = locatedExpr(Group((array_index | identifier) + EQ + gen_expr))
         assignment.setParseAction(self.enrich_assignment)
         var_decl_with_assign = locatedExpr(
@@ -296,7 +297,6 @@ class Parser:
 
 # TODO: arrays with variable size.
 # TODO: support templates.
-# TODO: support comments
 
 
 def parse_program(text: str) -> list:

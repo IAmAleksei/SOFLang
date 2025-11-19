@@ -3,7 +3,10 @@ load @/dict
 Num main() {
     Dict dict
     Num kkk = 7
-    Num vvv = 89
-    Dict dict2 = add_to_dict(dict, kkk, vvv)
-    result = get_from_dict(dict2, kkk)
+    Dict dict2 = add_to_dict(dict, kkk, 89)
+    Num answer = get_from_dict(dict2, kkk)
+    Num check = answer ~ 89
+    check ~ 0 ?? {
+        error
+    }
 }

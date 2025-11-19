@@ -114,18 +114,22 @@ class SingleFunctionTinyTranslator:
                     self.save_instr(DLoadI())
         elif isinstance(atom.value, FunctionCall):
             called_func = self.all_functions[atom.value.name]
-            self.calc_and_alloc(f"{called_func.name}_res", called_func.return_class_type, called_func.return_array_size)
+            space = self.calculate_space(called_func.return_class_type, called_func.return_array_size)
+            self.save_instr(AllocI(space))
+            self.stack_pos += space
             dump_pos = len(self.result)
             self.save_instr(Error())
             self.stack_pos += 1
             allocated_stack = 0
-            for param, var_name in zip(called_func.parameters, atom.value.parameters):
-                sz = self._load_var_on_stack(var_name)
+            for param, pvalue in zip(called_func.parameters, atom.value.parameters):
+                stack_before = self.stack_pos
+                self._parse_atom(pvalue)
+                sz = self.stack_pos - stack_before
                 allocated_stack += sz
                 self.variable_allocations[len(self.result) - 1] = (param.name, sz)
             self.save_instr(TempJumpAI(called_func.name))
-            after_jump_pos = len(self.result)
-            self.result[dump_pos] = DumpI(after_jump_pos - dump_pos)
+            self.save_instr(NoOpI())
+            self.result[dump_pos] = DumpI(len(self.result) - 1 - dump_pos)
             self.stack_pos -= 1 + allocated_stack  # The memory will be clean by callee.
         elif isinstance(atom.value, FieldAccess):
             shift = 0
@@ -164,25 +168,60 @@ class SingleFunctionTinyTranslator:
         if isinstance(expr, Atom):
             self._parse_atom(expr)
         elif isinstance(expr, GeneralExpr):
+            res_location = self.stack_pos + 1
+            self.save_instr(AllocI(1))
+            self.stack_pos += 1
+            stack_start_left = self.stack_pos + 1
             self._parse_expr(expr.left)
+            stack_start_right = self.stack_pos + 1
             self._parse_expr(expr.right)
-            if expr.op == "+":
-                self.save_instr(AddI())
-            elif expr.op == "-":
-                self.save_instr(SubI())
-            elif expr.op == "*":
-                self.save_instr(MulI())
-            elif expr.op == "/":
-                self.save_instr(DivI())
+            one_expr_sz = stack_start_right - stack_start_left
+            assert one_expr_sz == self.stack_pos - stack_start_right + 1
+
+            def perform_single_number_op(op: Instruction):
+                self.save_instr(LoadI(self.stack_pos - stack_start_left))
+                self.stack_pos += 1
+                self.save_instr(LoadI(self.stack_pos - stack_start_right))
+                self.stack_pos += 1
+                self.save_instr(op)
+                self.stack_pos -= 1
+                self.save_instr(StoreI(self.stack_pos - res_location))
+                self.stack_pos -= 1
+
+            if expr.op == "+" and one_expr_sz == 1:
+                perform_single_number_op(AddI())
+            elif expr.op == "-" and one_expr_sz == 1:
+                perform_single_number_op(SubI())
+            elif expr.op == "*" and one_expr_sz == 1:
+                perform_single_number_op(MulI())
+            elif expr.op == "/" and one_expr_sz == 1:
+                perform_single_number_op(DivI())
+            elif expr.op == "~":
+                for i in range(one_expr_sz):
+                    self.save_instr(LoadI(self.stack_pos - stack_start_left - i))
+                    self.stack_pos += 1
+                    self.save_instr(LoadI(self.stack_pos - stack_start_right - i))
+                    self.stack_pos += 1
+                    self.save_instr(SubI())
+                    self.stack_pos -= 1
+                    self.save_instr(InvI())
+                    if i > 0:
+                        self.save_instr(MulI())
+                        self.stack_pos -= 1
+                self.save_instr(StoreI(self.stack_pos - res_location))
+                self.stack_pos -= 1
             else:
                 raise ValueError()
-            self.stack_pos -= 1
+            self.save_instr(PopI(one_expr_sz))
+            self.stack_pos -= one_expr_sz
+            self.save_instr(PopI(one_expr_sz))
+            self.stack_pos -= one_expr_sz
         elif isinstance(expr, UnaryExpr):
             self._parse_expr(expr.operand)
-            if expr.op == "~":
-                self.save_instr(InvI())
-            else:
-                raise ValueError()
+            # if expr.op == "~":
+            #     self.save_instr(InvI())
+            # else:
+            raise ValueError()
         else:
             raise ValueError()
 
@@ -279,7 +318,7 @@ class SingleFunctionTinyTranslator:
             self.var_classes[p.name] = p.class_type
             self.stack_pos += space
         self._parse_body(function.body)
-        self._clean_stack(p.name for p in function.parameters)
+        self._clean_stack(p.name for p in function.parameters[::-1])
         if function.name == 'main':
             self.save_instr(ExitI())
         else:

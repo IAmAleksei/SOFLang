@@ -44,10 +44,8 @@ class Debugger:
             i.apply(self.ec)
             if cur_ip in self.debug_info.variable_allocations:
                 var_name, var_size = self.debug_info.variable_allocations[cur_ip]
-                self.vars.append(
-                    VarDebugInfo(var_name, self.ec.sp - var_size + 1, var_size)
-                )
-            if isinstance(i, PopI):
+                self.vars.append(VarDebugInfo(var_name, self.ec.sp - var_size + 1, var_size))
+            while len(self.vars) > 0 and self.ec.sp < self.vars[-1].start_sp:
                 self.vars.pop()
             self.cur_line = self.debug_info.source_code_lines[self.ec.ip]
         else:
@@ -93,6 +91,6 @@ def run_debugger(compiled_code_with_debug_info: TranslationResult, source_code: 
                 while True:
                     debugger.forward()
             debugger.print_state()
-    except ValueError:
-        print("Finished")
+    except ValueError as e:
+        print(f"Exception: {e}")
         debugger.print_state()

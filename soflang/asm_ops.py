@@ -334,15 +334,28 @@ class AllocI(Instruction):
         return binarify_instruction(64, [(2, self.size)])
 
 
+@dataclass
 class CrashI(Instruction):
     def apply(self, ec: ExecutionContext):
-        raise ValueError("Exception")
+        raise ValueError("Crash")
 
     def __str__(self):
         return f"CRASH"
 
     def binarify(self):
         return binarify_instruction(65)
+
+
+@dataclass
+class NoOpI(Instruction):
+    def apply(self, ec: ExecutionContext):
+        self.inc_ip(ec)
+
+    def __str__(self):
+        return f"NOOP"
+
+    def binarify(self):
+        return binarify_instruction(66)
 
 
 class ExitI(Instruction):
@@ -416,6 +429,10 @@ def parse_asm(lines) -> List[Instruction]:
             result.append(DumpI(int(args[0])))
         elif opcode == "RETURN":
             result.append(ReturnI())
+        elif opcode == "CRASH":
+            result.append(CrashI())
+        elif opcode == "NOOP":
+            result.append(NoOpI())
         elif opcode == "EXIT":
             result.append(ExitI())
         else:
