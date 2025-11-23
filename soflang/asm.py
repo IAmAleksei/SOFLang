@@ -196,6 +196,8 @@ class SingleFunctionTinyTranslator:
                 perform_single_number_op(MulI())
             elif expr.op == "/" and one_expr_sz == 1:
                 perform_single_number_op(DivI())
+            elif expr.op == '<' and one_expr_sz == 1:
+                perform_single_number_op(LessI())
             elif expr.op == "~":
                 for i in range(one_expr_sz):
                     self.save_instr(LoadI(self.stack_pos - stack_start_left - i))

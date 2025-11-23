@@ -9,7 +9,8 @@ Num main() {
     result ~ 0 ?? {
         error
     }
-    set3#size ~ 2 ?? {
+    auto inner = set3#items
+    inner#size ~ 2 ?? {
         error
     }
 }

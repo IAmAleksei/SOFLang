@@ -30,12 +30,12 @@ class Parser:
             size_val = int(size_val['value'])
         elif size_val['type'] == 'placeholder':
             pass
-        return {'kind': {'dim': 'array', 'size': size_val}, 'base': base, 'template_params': template_params}
+        return {'kind': {'dim': 'array', 'size': size_val}, 'base': base, 'type': 'type', 'template_params': template_params}
 
     def enrich_simple_type(self, tokens):
         base = tokens[0].get('base_type')[0]
         template_params = tokens[0].get('template', {}).get('value', [])
-        return {'kind': {'dim': 'simple'}, 'base': base, 'template_params': template_params}
+        return {'kind': {'dim': 'simple'}, 'base': base, 'type': 'type', 'template_params': template_params}
 
     def enrich_var_decl(self, tokens):
         start_symbol = tokens[0].locn_start
@@ -304,7 +304,7 @@ class Parser:
         atom.setParseAction(self.make_atom)
         function_call <<= Group(identifier("func_name") + Optional(template)("template") + LPAR + Optional(delimitedList(atom))("parameters") + RPAR)
         function_call.setParseAction(self.enrich_function_call)
-        expr = Group(atom + oneOf("* / + - ~") + atom)
+        expr = Group(atom + oneOf("* / + - ~ <") + atom)
         expr.setParseAction(self.enrich_binary_expr)
         # unary_expr = Group(oneOf("~") + atom)
         # unary_expr.setParseAction(self.enrich_unary_expr)

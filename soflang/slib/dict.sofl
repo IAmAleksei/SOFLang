@@ -1,27 +1,52 @@
+load @/dynarray
+
 Pair<K,V>: key#<K> x value#<V>
-Dict<K,V,S>: items#Pair<K,V>*<S> x size#Num
+Dict<K,V,S>: items#Dynarray<Pair<K,V>,S>
 
 Dict<K,V,S> add_to_dict<K,V,S>(Dict<K,V,S> cur, <K> k, <V> v) {
-    Num size = cur#size
-    Num newsize = size + 1
-    Num limit = <S> + 1
-    newsize ~ limit ?? {
-        error
+    auto idx = find_internal_index<K,V,S>(cur, k)
+    auto check = idx < 0
+    auto items = cur#items
+    auto newpair = Pair<K,V>(k, v)
+    check ?? {
+        items = add_to_dynarray<Pair<K,V>,S>(items, newpair)
     }
-    Pair<K,V>*<S> items = cur#items
-    items[size] = Pair<K,V>(k, v)
-    result = Dict<K,V,S>(items, newsize)
+    check ~ 0 ?? {
+        items = set_in_dynarray<Pair<K,V>,S>(items, idx, newpair)
+    }
+    result = Dict<K,V,S>(items)
 }
 
 <V> get_from_dict<K,V,S>(Dict<K,V,S> cur, <K> k) {
-    Pair<K,V>*<S> items = cur#items
-    Num i = cur#size
+    auto idx = find_internal_index<K,V,S>(cur, k)
+    idx < 0 ?? {
+        error
+    }
+    auto items = cur#items
+    auto item = get_from_dynarray<Pair<K,V>,S>(items, idx)
+    result = item#value
+}
+
+Num find_internal_index<K,V,S>(Dict<K,V,S> cur, <K> k) {
+    auto array = cur#items
+    Num i = get_size_of_dynarray<Pair<K,V>,S>(array)
+    result = -1
     i ...? {
         Num j = i - 1
-        Pair<K,V> p = items[j]
+        auto p = get_from_dynarray<Pair<K,V>,S>(array, j)
         p#key ~ k ?? {
-            result = p#value
+            result = j
         }
         i = i - 1
     }
+}
+
+Dict<K,V,S> pop_from_dict<K,V,S>(Dict<K,V,S> cur, <K> k) {
+    auto idx = find_internal_index<K,V,S>(cur, k)
+    idx < 0 ?? {
+        error
+    }
+    auto items = cur#items
+    items = remove_from_dynarray<Pair<K,V>,S>(cur, idx)
+    result = Dict<K,V,S>(items)
 }

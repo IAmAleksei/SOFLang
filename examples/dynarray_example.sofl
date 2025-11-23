@@ -1,0 +1,12 @@
+load @/dict
+
+Num main() {
+    Dynarray<Num,10> arr
+    Num kkk = 7
+    Dict<Num,Num,10> dict2 = add_to_dict<Num,Num,10>(dict, kkk, 89)
+    result = get_from_dict<Num,Num,10>(dict2, kkk)
+    Num check = result ~ 89
+    check ~ 0 ?? {
+        error
+    }
+}

@@ -1,4 +1,6 @@
-Set<V,S>: items#<V>*<S> x size#Num
+load @/dynarray
+
+Set<V,S>: items#Dynarray<V,S>
 
 Set<V,S> add_to_set<V,S>(Set<V,S> cur, <V> v) {
     Num present = is_in_set<V,S>(cur, v)
@@ -6,24 +8,17 @@ Set<V,S> add_to_set<V,S>(Set<V,S> cur, <V> v) {
         result = cur
     }
     present ~ 0 ?? {
-        Num size = cur#size
-        Num newsize = size + 1
-        Num limit = <S> + 1
-        newsize ~ limit ?? {
-            error
-        }
-        auto items = cur#items
-        items[size] = v
-        result = Set<V,S>(items, newsize)
+        auto newitems = add_to_dynarray<V,S>(cur#items, v)
+        result = Set<V,S>(newitems)
     }
 }
 
 Num is_in_set<V,S>(Set<V,S> cur, <V> v) {
-    auto items = cur#items
-    Num i = cur#size
+    auto array = cur#items
+    Num i = array#size
     i ...? {
         Num j = i - 1
-        <V> p = items[j]
+        auto p = get_from_dynarray<V,S>(array, j)
         p ~ v ?? {
             result = 1
         }

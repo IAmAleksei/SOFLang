@@ -56,6 +56,11 @@ def resolve_templates(parsed_text: list) -> list:
         for p in call['template_params']:
             if p.get('type') == 'placeholder':
                 resolved_params.append(template_params[p['value']])
+            elif p.get('type') == 'type':
+                resolve_type(p, template_params)
+                resolved_params.append(p)
+            # elif p.get('type') == 'type':
+            #     assert not p['template_params'], str(p) + str(template_params)
             else:
                 resolved_params.append(p)
         resolved_name = resolve_template_expr(call['identifier'], resolved_params)
@@ -101,8 +106,13 @@ def resolve_templates(parsed_text: list) -> list:
             for p in kind['template_params']:
                 if p.get('type') == 'placeholder':
                     resolved_params.append(template_params[p['value']])
+                elif p.get('type') == 'type':
+                    resolve_type(p, template_params)
+                    resolved_params.append(p)
+                    # assert not p['template_params'], str(p) + str(template_params)
                 else:
                     resolved_params.append(p)
+            # assert len(resolved_params) != 3 or not resolved_params[0]['template_params'], str(resolved_params)
             resolved_name = resolve_template_expr(kind['base']['value'], resolved_params)
             kind['base']['value'] = resolved_name
             kind['template_params'] = []
@@ -124,6 +134,7 @@ def resolve_templates(parsed_text: list) -> list:
         for p, v in zip(template_decl['template_params'], resolved_params):
             assert p['type'] == 'placeholder'
             template_params[p['value']] = v
+        assert len(template_decl['template_params']) == len(resolved_params), str(template_decl) + " " + str(len(resolved_params))
         resolved_params_str = []
         for rp in resolved_params:
             if rp.get('type') == 'placeholder':
@@ -131,7 +142,8 @@ def resolve_templates(parsed_text: list) -> list:
             elif rp.get('type') == 'integer':
                 resolved_params_str.append(str(rp['value']))
             else:
-                assert not rp['template_params']
+                resolve_type(rp, template_params)
+                assert not rp['template_params'], str(rp)
                 base = rp['base']
                 assert base['type'] == 'identifier'
                 resolved_params_str.append(base['value'])

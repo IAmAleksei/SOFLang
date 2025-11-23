@@ -358,6 +358,20 @@ class NoOpI(Instruction):
         return binarify_instruction(66)
 
 
+@dataclass
+class LessI(Instruction):
+    def apply(self, ec: ExecutionContext):
+        b = ec.pop()
+        ec.push(1 if ec.pop() < b else 0)
+        self.inc_ip(ec)
+
+    def __str__(self):
+        return f"LESS"
+
+    def binarify(self):
+        return binarify_instruction(67)
+
+
 class ExitI(Instruction):
     def apply(self, ec: ExecutionContext):
         raise ValueError()

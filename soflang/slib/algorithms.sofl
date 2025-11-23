@@ -1,0 +1,22 @@
+load @/dynarray
+
+// Finds the position of the first element higher than a given element.
+Num find_next_pos<V,S>(Dynarray<V,S> cur, Num element) {
+    auto l = -1
+    auto r = get_size_of_dynarray<V,S>(cur)
+    auto d = r - l
+    1 < d ...? {
+        auto mid = l + r
+        mid = mid / 2
+        auto value = get_from_dynarray<V,S>(cur, mid)
+        auto check = element < value
+        check ?? {
+            r = mid
+        }
+        check ~ 0 ?? {
+            l = mid
+        }
+        d = r - l
+    }
+    result = r
+}

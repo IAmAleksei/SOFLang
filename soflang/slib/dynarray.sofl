@@ -1,0 +1,63 @@
+Dynarray<V,S>: items#<V>*<S> x size#Num
+
+Dynarray<V,S> add_to_dynarray<V,S>(Dynarray<V,S> cur, <V> v) {
+    Num size = cur#size
+    Num newsize = size + 1
+    Num limit = <S>
+    limit < newsize ?? {
+        error
+    }
+    auto items = cur#items
+    items[size] = v
+    result = Dynarray<V,S>(items, newsize)
+}
+
+<V> get_from_dynarray<V,S>(Dynarray<V,S> cur, Num idx) {
+    Num limit = cur#size - 1
+    limit < idx ?? {
+        error
+    }
+    auto items = cur#items
+    result = items[idx]
+}
+
+Dynarray<V,S> set_in_dynarray<V,S>(Dynarray<V,S> cur, Num idx, <V> v) {
+    Num size = cur#size
+    size < idx ?? {
+        error
+    }
+    size ~ idx ?? {
+        error
+    }
+    auto items = cur#items
+    items[idx] = v
+    result = Dynarray<V,S>(items, size)
+}
+
+Dynarray<V,S> pop_from_dynarray<V,S>(Dynarray<V,S> cur) {
+    auto last = cur#size
+    auto idx = last - 1
+    result = remove_from_dynarray<V,S>(cur,idx)
+}
+
+Dynarray<V,S> remove_from_dynarray<V,S>(Dynarray<V,S> cur, Num idx) {
+    Num limit = cur#size - 1
+    idx < 0 ?? {
+        error
+    }
+    limit < idx ?? {
+        error
+    }
+    auto items = cur#items
+    idx < limit ...? {
+        auto nextidx = idx + 1
+        items[idx] = items[nextidx]
+        idx = idx + 1
+    }
+    Num newsize = size - 1
+    result = Dynarray<V,S>(items, newsize)
+}
+
+Num get_size_of_dynarray<V,S>(Dynarray<V,S> cur) {
+    result = cur#size
+}
