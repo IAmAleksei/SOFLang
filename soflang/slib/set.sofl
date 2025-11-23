@@ -1,0 +1,32 @@
+Set<V,S>: items#<V>*<S> x size#Num
+
+Set<V,S> add_to_set<V,S>(Set<V,S> cur, <V> v) {
+    Num present = is_in_set<V,S>(cur, v)
+    present ?? {
+        result = cur
+    }
+    present ~ 0 ?? {
+        Num size = cur#size
+        Num newsize = size + 1
+        Num limit = <S> + 1
+        newsize ~ limit ?? {
+            error
+        }
+        auto items = cur#items
+        items[size] = v
+        result = Set<V,S>(items, newsize)
+    }
+}
+
+Num is_in_set<V,S>(Set<V,S> cur, <V> v) {
+    auto items = cur#items
+    Num i = cur#size
+    i ...? {
+        Num j = i - 1
+        <V> p = items[j]
+        p ~ v ?? {
+            result = 1
+        }
+        i = i - 1
+    }
+}

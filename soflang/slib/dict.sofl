@@ -1,26 +1,25 @@
-Pair: key#Num x value#Num
-Dict: items#Pair*10 x size#Num
+Pair<K,V>: key#<K> x value#<V>
+Dict<K,V,S>: items#Pair<K,V>*<S> x size#Num
 
-Dict add_to_dict(Dict cur, Num k, Num v) {
+Dict<K,V,S> add_to_dict<K,V,S>(Dict<K,V,S> cur, <K> k, <V> v) {
     Num size = cur#size
     Num newsize = size + 1
-    Num limit = newsize ~ 11
-    limit ?? {
+    Num limit = <S> + 1
+    newsize ~ limit ?? {
         error
     }
-    auto items = cur#items
-    items[size] = Pair(k, v)
-    result = Dict(items, newsize)
+    Pair<K,V>*<S> items = cur#items
+    items[size] = Pair<K,V>(k, v)
+    result = Dict<K,V,S>(items, newsize)
 }
 
-Num get_from_dict(Dict cur, Num k) {
-    Pair*10 items = cur#items
+<V> get_from_dict<K,V,S>(Dict<K,V,S> cur, <K> k) {
+    Pair<K,V>*<S> items = cur#items
     Num i = cur#size
     i ...? {
         Num j = i - 1
-        Pair p = items[j]
-        Num check = p#key ~ k
-        check ?? {
+        Pair<K,V> p = items[j]
+        p#key ~ k ?? {
             result = p#value
         }
         i = i - 1

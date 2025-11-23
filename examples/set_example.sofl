@@ -1,0 +1,15 @@
+load @/set
+
+Num main() {
+    Set<Num,10> set
+    Num kkk = 7
+    auto set2 = add_to_set<Num,10>(set, kkk)
+    auto set3 = add_to_set<Num,10>(set2, kkk)
+    result = is_in_set<Num,10>(set3, kkk)
+    result ~ 0 ?? {
+        error
+    }
+    set3#size ~ 2 ?? {
+        error
+    }
+}
