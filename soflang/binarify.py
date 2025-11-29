@@ -1,14 +1,16 @@
-from typing import List
+from typing import List, Tuple
 
 from soflang.asm_ops import *
 
 
-def encode_binary_asm(instructions: List[Instruction]) -> bytes:
+def encode_binary_asm(instructions: List[Instruction]) -> Tuple[bytes, dict]:
     prefix_shift = [0]
     for i in instructions:
         prefix_shift.append(prefix_shift[-1] + len(i.binarify()))
     bs = []
+    starts = {}
     for i in range(len(instructions)):
+        starts[len(bs)] = i
         fixed_instr = instructions[i]
         # Corrects ip jumps to align with byte positions.
         if isinstance(fixed_instr, JumpI):
@@ -20,17 +22,14 @@ def encode_binary_asm(instructions: List[Instruction]) -> bytes:
         elif isinstance(fixed_instr, DumpI):
             fixed_instr = DumpI(prefix_shift[i + fixed_instr.shift] - prefix_shift[i])
         bs.extend(fixed_instr.binarify())
-    return bytes(bs)
+    return bytes(bs), starts
 
 
 def decode_binary_value(bs: bytes, idx, l) -> int:
-    max_val = 1 << (8 * l - 1)
     val = 0
     for b in range(idx, idx + l):
         val = 256 * val + bs[b]
-    if val >= max_val:
-        val = -(val - max_val)
-    return val
+    return unsigned_to_signed(val, l)
 
 
 def decode_binary_asm(bytes: bytes, idx) -> Instruction:
@@ -73,6 +72,8 @@ def decode_binary_asm(bytes: bytes, idx) -> Instruction:
         return CrashI()
     elif opcode == 66:
         return NoOpI()
+    elif opcode == 67:
+        return LessI()
     elif opcode == 255:
         return ExitI()
     else:

@@ -7,71 +7,79 @@ from soflang.asm import (
     parse_asm, translate,
 )
 from soflang.binarify import decode_binary_asm, encode_binary_asm
-from soflang.debugger import run_debugger
+from soflang.debugger import run_debugger, DebuggerWithCPU
 from soflang.lvm import LionVM
 from soflang.preprocess import recursive_parse
 from soflang.validator import MilliValidator
 
 
-# def parse(ifile: str):
-#     assert ifile.endswith('.sofl')
-#     ofile = ifile[:-5] + '.json'
-#     with open(ifile, 'r') as f:
-#         text = "".join(f.readlines())
-#     out = centi_parser.Parser().parse_program(text)
-#     with open(ofile, 'w') as f:
-#         json.dump(out, f, indent=1, default=str)
-#
-#
-# def analyze(ifile: str) -> List[Function]:
-#     a = BonAnalyzer()
-#     with open(ifile, 'r') as f:
-#         text = json.load(f)
-#     a.analyze(text)
-#     return a.get_functions()
-#
-#
-# def validator(functions: List[Function]) -> bool:
-#     v = MilliValidator()
-#     errors = v.validate(functions)
-#     if errors:
-#         print("Found errors:")
-#         for err in errors:
-#             print("-", err)
-#         return False
-#     return True
-#
-#
-# def asm(functions: List[Function], ofile: str):
-#     instructions = translate(functions).asm_instructions
-#     with open(ofile, 'w') as f:
-#         for i in instructions:
-#             f.write(f"{i.__str__()}\n")
-#
-#
-# def binarify_asm(ifile: str):
-#     assert ifile.endswith('.sasm')
-#     ofile = ifile[:-5] + '.bsasm'
-#     with open(ifile, 'r') as f:
-#         instructions = parse_asm(f.readlines())
-#     bs = encode_binary_asm(instructions)
-#     with open(ofile, 'wb') as f:
-#         f.write(bs)
-#
-#
-# def execute(ifile: str):
-#     if ifile.endswith('.sasm'):
-#         with open(ifile, 'r') as f:
-#             instructions = parse_asm(f.readlines())
-#         LionVM().run(instructions)
-#     elif ifile.endswith('.bsasm'):
-#         with open(ifile, 'rb') as f:
-#             bcode = f.read()
-#         LionVM().run_binary(bcode)
+def resolve(ifile):
+    assert ifile.endswith('.sofl')
+    ofile = ifile[:-5] + '_pp.sofl'
+    _, text = preprocess.parse_with_imports_resolution(ifile)
+    with open(ofile, 'w') as f:
+        f.write(text)
+
+
+def parse(ifile: str):
+    assert ifile.endswith('.sofl')
+    ofile = ifile[:-5] + '.json'
+    with open(ifile, 'r') as f:
+        text = "".join(f.readlines())
+    out = centi_parser.Parser().parse_program(text, after_template_resolution=True)
+    with open(ofile, 'w') as f:
+        json.dump(out, f, indent=1, default=str)
+
+
+def analyze(ifile: str) -> List[Function]:
+    a = BonAnalyzer()
+    with open(ifile, 'r') as f:
+        text = json.load(f)
+    a.analyze(text)
+    return a.get_functions()
+
+
+def validator(functions: List[Function]) -> bool:
+    v = MilliValidator()
+    errors = v.validate(functions)
+    if errors:
+        print("Found errors:")
+        for err in errors:
+            print("-", err)
+        return False
+    return True
+
+
+def asm(functions: List[Function], ofile: str):
+    instructions = translate(functions, {}).asm_instructions
+    with open(ofile, 'w') as f:
+        for i in instructions:
+            f.write(f"{i.__str__()}\n")
+
+
+def binarify_asm(ifile: str):
+    assert ifile.endswith('.sasm')
+    ofile = ifile[:-5] + '.bsasm'
+    with open(ifile, 'r') as f:
+        instructions = parse_asm(f.readlines())
+    bs, _ = encode_binary_asm(instructions)
+    with open(ofile, 'wb') as f:
+        f.write(bs)
+
+
+def execute(ifile: str):
+    if ifile.endswith('.sasm'):
+        with open(ifile, 'r') as f:
+            instructions = parse_asm(f.readlines())
+        LionVM().run(instructions)
+    elif ifile.endswith('.bsasm'):
+        with open(ifile, 'rb') as f:
+            bcode = f.read()
+        LionVM().run_binary(bcode)
 
 
 def compile_and_run(ifile):
-    parsed = recursive_parse(ifile)
+    parsed, _ = preprocess.parse_with_imports_resolution(ifile)
 
     analyzer = BonAnalyzer()
     analyzer.analyze(parsed)
@@ -84,8 +92,8 @@ def compile_and_run(ifile):
         return
 
     asm_instructions = translate(analyzer.get_functions(), analyzer.classes, with_debug=False).asm_instructions
-
-    LionVM().run(asm_instructions)
+    bs, _ = encode_binary_asm(asm_instructions)
+    LionVM().run_with_cpu_simulation(bs)
 
 
 def compile_and_debug(ifile):
@@ -102,7 +110,9 @@ def compile_and_debug(ifile):
         return
 
     enriched_result = translate(analyzer.get_functions(), analyzer.classes, with_debug=True)
-    run_debugger(enriched_result, text.split('\n'))
+
+    debugger = DebuggerWithCPU(enriched_result, text.split('\n'))
+    run_debugger(debugger)
 
 
 def main():

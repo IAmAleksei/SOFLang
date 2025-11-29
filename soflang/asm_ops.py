@@ -2,25 +2,56 @@ from dataclasses import dataclass
 from typing import Optional, List
 
 
+def unsigned_to_signed(val, byte_size):
+    max_val = 1 << (8 * byte_size - 1)
+    if val >= max_val:
+        val = val - 2 * max_val
+    return val
+
+
+def signed_to_array(val, byte_size):
+    max_val = 1 << (8 * byte_size - 1)
+    assert abs(val) < max_val
+    if val < 0:
+        val = 2 * max_val + val
+    arg = []
+    for _ in range(byte_size):
+        arg.append(val % 256)
+        val //= 256
+    return arg[::-1]
+
+
 @dataclass
 class ExecutionContext:
     stack: list[int]
     sp: int
     ip: int
     binary_source: bool
+    num_size: int = 4
+
+    def load_num(self, idx):
+        res = 0
+        for i in range(self.num_size):
+            res = (res << 8) + self.stack[4 * idx + i]
+        return unsigned_to_signed(res, self.num_size)
+
+    def store_num(self, idx, v):
+        arr = signed_to_array(v, self.num_size)
+        for i in range(self.num_size):
+            self.stack[4 * idx + i] = arr[i]
 
     def push(self, v):
         self.sp += 1
-        self.stack[self.sp] = v
+        self.store_num(self.sp, v)
 
     def pop(self) -> int:
-        res = self.stack[self.sp]
-        self.stack[self.sp] = 0
+        res = self.load_num(self.sp)
+        self.store_num(self.sp, 0)
         self.sp -= 1
         return res
 
     def store(self, i, v):
-        self.stack[i] = v
+        self.store_num(i, v)
 
     def copy(self):
         return ExecutionContext(self.stack.copy(), self.sp, self.ip, self.binary_source)
@@ -30,17 +61,7 @@ def binarify_instruction(code, args: Optional[list[tuple[int, int]]] = None) -> 
     args = args or []
     result = [code]
     for l, val in args:
-        # The 1st bit is the sign. Other bits are used to encode the number.
-        max_val = 1 << (8 * l - 1)
-        assert abs(val) < max_val
-        if val < 0:
-            val = -val
-            val |= max_val
-        arg = []
-        for _ in range(l):
-            arg.append(val % 256)
-            val //= 256
-        result.extend(arg[::-1])
+        result.extend(signed_to_array(val, l))
     return result
 
 
@@ -198,7 +219,7 @@ class LoadI(Instruction):
 
     def apply(self, ec: ExecutionContext):
         dest_pos = ec.sp - self.relative_position
-        ec.push(ec.stack[dest_pos])
+        ec.push(ec.load_num(dest_pos))
         self.inc_ip(ec)
 
     def __str__(self):
@@ -212,7 +233,7 @@ class LoadI(Instruction):
 class DLoadI(Instruction):
     def apply(self, ec: ExecutionContext):
         dest_pos = ec.sp - ec.pop()
-        ec.push(ec.stack[dest_pos])
+        ec.push(ec.load_num(dest_pos))
         self.inc_ip(ec)
 
     def __str__(self):
@@ -374,7 +395,7 @@ class LessI(Instruction):
 
 class ExitI(Instruction):
     def apply(self, ec: ExecutionContext):
-        raise ValueError()
+        raise ValueError("Exit")
 
     def __str__(self):
         return f"EXIT"

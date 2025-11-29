@@ -10,6 +10,7 @@ IF, WHILE, AUTO, LOAD = map(Keyword, "?? ...? auto load".split())
 
 class Parser:
     def __init__(self):
+        self.after_template_resolution = False
         self.text = ""
 
     def get_line(self, pos) -> int:
@@ -35,6 +36,8 @@ class Parser:
     def enrich_simple_type(self, tokens):
         base = tokens[0].get('base_type')[0]
         template_params = tokens[0].get('template', {}).get('value', [])
+        if self.after_template_resolution:
+            assert not template_params
         return {'kind': {'dim': 'simple'}, 'base': base, 'type': 'type', 'template_params': template_params}
 
     def enrich_var_decl(self, tokens):
@@ -61,6 +64,8 @@ class Parser:
         template_params = data.get('template')
         if template_params:
             template_params = template_params[0].get('value', [])
+        if self.after_template_resolution:
+            assert not template_params
 
         return {
             'type': 'func_call',
@@ -76,6 +81,8 @@ class Parser:
         template_params = data.get('template')
         if template_params:
             template_params = template_params[0].get('value', [])
+        if self.after_template_resolution:
+            assert not template_params
 
         return {
             'type': 'constructor_call',
@@ -204,6 +211,8 @@ class Parser:
         template_params = inner.get('template')
         if template_params:
             template_params = template_params[0].get('value', [])
+        if self.after_template_resolution:
+            assert not template_params
 
         return {
             'type': 'func_decl',
@@ -235,6 +244,8 @@ class Parser:
         template_params = inner.get('template')
         if template_params:
             template_params = template_params[0].get('value', [])
+        if self.after_template_resolution:
+            assert not template_params
 
         return {
             'type': 'clazz_decl',
@@ -336,6 +347,7 @@ class Parser:
         global_expr = ZeroOrMore(LN) + ZeroOrMore((import_decl | func_decl | clazz_decl | comment_expr) + OneOrMore(LN))
         global_expr.setParseAction(self.enrich_global_expr)
         self.text = text
+        self.after_template_resolution = after_template_resolution
         return list(global_expr.parse_string(self.text, parse_all=True))
 
 

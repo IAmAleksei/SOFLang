@@ -168,9 +168,9 @@ class SingleFunctionTinyTranslator:
         if isinstance(expr, Atom):
             self._parse_atom(expr)
         elif isinstance(expr, GeneralExpr):
-            res_location = self.stack_pos + 1
             self.save_instr(AllocI(1))
             self.stack_pos += 1
+            res_location = self.stack_pos
             stack_start_left = self.stack_pos + 1
             self._parse_expr(expr.left)
             stack_start_right = self.stack_pos + 1

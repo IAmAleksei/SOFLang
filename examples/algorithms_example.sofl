@@ -9,5 +9,5 @@ Num main() {
     arr = add_to_dynarray<Num,10>(arr, 3)
     arr = add_to_dynarray<Num,10>(arr, 4)
     arr = add_to_dynarray<Num,10>(arr, 8)
-    result = find_next_pos<Num,10>(arr, 0)
+    result = find_next_pos<Num,10>(arr, 3)
 }
