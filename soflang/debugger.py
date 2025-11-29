@@ -13,11 +13,11 @@ class VarDebugInfo:
     start_sp: int
     size: int
 
-    def format(self, value_getter: Callable[[int], int]):
+    def format(self, value_getter: Callable[[int], int], spacing: int):
         if self.size == 1:
             v = value_getter(self.start_sp)
         else:
-            v = [value_getter(i) for i in range(self.start_sp, self.start_sp + self.size)]
+            v = [value_getter(self.start_sp + i * spacing) for i in range(self.size)]
         return f"{self.name} = {v}"
 
 
@@ -42,7 +42,7 @@ class AbstractDebugger:
         self.make_step()
         if cur_ip in self.debug_info.variable_allocations:
             var_name, var_size = self.debug_info.variable_allocations[cur_ip]
-            self.vars.append(VarDebugInfo(var_name, self.get_cur_sp() - var_size + 1, var_size))
+            self.vars.append(VarDebugInfo(var_name, self.get_cur_sp() - (var_size - 1) * self.get_spacing(), var_size))
         while len(self.vars) > 0 and self.get_cur_sp() < self.vars[-1].start_sp:
             self.vars.pop()
         self.cur_line = self.debug_info.source_code_lines[self.get_cur_ip()]
@@ -69,7 +69,7 @@ class AbstractDebugger:
             print(code_line)
             print("-" * len(code_line))
         for v in self.vars:
-            print(v.format(self.load_stack_value))
+            print(v.format(self.load_stack_value, self.get_spacing()))
         print()
         cur_ip = self.get_cur_ip()
         asm_prefix = f"{cur_ip + 1}"
