@@ -1,16 +1,12 @@
-load dict
-
 Num main() {
-    Num n
-    Num a
+    Num n = 6
+    Num a = 0
     Num b = 1
-    n = 6
-    a = 0
     n ...? {
         auto tmp = a
         a = b
         b = b + tmp
         n = n - 1
     }
-    result = a + 48
+    result = a
 }

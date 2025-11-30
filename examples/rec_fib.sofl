@@ -1,26 +1,20 @@
 Num recfib(Num n) {
-    Num iszero
-    iszero = ~n
-    Num isone
-    isone = n - 1
-    isone = ~isone
+    Num iszero = n ~ 0
+    Num isone = n ~ 1
     isone ?? {
         result = 1
     }
-    ~isone ?? {
-        ~iszero ?? {
-            Num a
-            a = n - 2
-            Num b
-            b = n - 1
+    isone ~ 0 ?? {
+        iszero ~ 0 ?? {
+            Num a = n - 2
+            Num b = n - 1
             result = recfib(a) + recfib(b)
         }
     }
 }
 
 Num main() {
-    Num n
-    n = 6
+    Num n = 6
     result = recfib(n)
-    result = result + 48
+    result = result
 }

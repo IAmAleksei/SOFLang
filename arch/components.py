@@ -11,40 +11,38 @@ class Memory:
         self.motherboard = motherboard
 
     def read8(self, idx: Number32) -> Number8:
-        i = idx.to_int()
-        return self.array[i]
+        return self.array[idx.to_int()]
 
     def read32(self, idx: Number32) -> Number32:
         return Number32([
             self.read8(idx),
-            self.read8(idx + ONE32()),
-            self.read8(idx + TWO32()),
-            self.read8(idx + THREE32()),
+            self.read8(idx + ONE32),
+            self.read8(idx + TWO32),
+            self.read8(idx + THREE32),
         ])
 
     def write8(self, idx: Number32, value: Number8):
-        i = idx.to_int()
-        self.array[i] = value
+        self.array[idx.to_int()] = value
 
     def write32(self, idx: Number32, value: Number32):
         self.write8(idx, value.array[0])
-        self.write8(idx + ONE32(), value.array[1])
-        self.write8(idx + TWO32(), value.array[2])
-        self.write8(idx + THREE32(), value.array[3])
+        self.write8(idx + ONE32, value.array[1])
+        self.write8(idx + TWO32, value.array[2])
+        self.write8(idx + THREE32, value.array[3])
 
 
 # TODO: cache L1/L2/L3
 class CPU:
     def __init__(self, motherboard: 'Lionboard'):
-        self.ip: Number32 = ZERO32()
-        self.reg0: Number32 = ZERO32()
-        self.reg1: Number32 = ZERO32()
-        self.reg2: Number32 = ZERO32()
-        self.reg3: Number32 = ZERO32()
-        self.reg4: Number32 = ZERO32()
-        self.reg5: Number32 = ZERO32()
-        self.ir: Number64 = ZERO64()
-        self.sp: Number32 = ZERO32()
+        self.ip: Number32 = ZERO32
+        self.reg0: Number32 = ZERO32
+        self.reg1: Number32 = ZERO32
+        self.reg2: Number32 = ZERO32
+        self.reg3: Number32 = ZERO32
+        self.reg4: Number32 = ZERO32
+        self.reg5: Number32 = ZERO32
+        self.ir: Number64 = ZERO64
+        self.sp: Number32 = ZERO32
         self.motherboard: Lionboard = motherboard
 
     def cycle(self):
@@ -54,289 +52,287 @@ class CPU:
 
     def fetch(self):
         # Read 5 bytes
-        self.ir.clear()
-        self.reg0 = self.ip.copy()
+        self.reg0 = self.ip
         self.read()
-        self.ir.array[0] = self.reg2.array[3].copy()
+        self.reg3 = self.reg2
 
-        self.reg1 = ONE32()
+        self.reg1 = ONE32
         self.add()
-        self.reg0 = self.reg2.copy()
+        self.reg0 = self.reg2
         self.read32()
-        for i in range(4):
-            self.ir.array[1 + i] = self.reg2.array[i].copy()
+        self.ir = Number64([
+            self.reg3.array[3],
+            self.reg2.array[0],
+            self.reg2.array[1],
+            self.reg2.array[2],
+            self.reg2.array[3],
+            ZERO8,
+            ZERO8,
+            ZERO8,
+        ])
 
     def decode(self):
-        self.reg0.clear()
         if self.ir.array[0] == Number8([False, False, True, True, False, True, False, True]):
             # PUSH
-            for i in range(4):
-                self.reg0.array[i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([self.ir.array[1], self.ir.array[2], self.ir.array[3], self.ir.array[4]])
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, True, False]):
             # POP
-            self.reg0.array[3] = self.ir.array[1].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, ZERO8, self.ir.array[1]])
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, True, True]):
             # STORE
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, False, True]):
             # LOAD
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, True, True]):
             # JUMP
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
-            self.reg0.extend_from_num16()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
+            self.reg0 = self.reg0.extend_from_num16()
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, False, False]):
             # JUMP0
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, False, True]):
             # JUMPA
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, True, False]):
             # DUMP
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, False, False]):
             # ALLOC
-            for i in range(2):
-                self.reg0.array[2 + i] = self.ir.array[1 + i].copy()
+            self.reg0 = Number32([ZERO8, ZERO8, self.ir.array[1], self.ir.array[2]])
 
     def read_two_args_from_ram(self):
-        self.dec_sp(FOUR32())
-        self.reg0 = self.sp.copy()
+        self.dec_sp(FOUR32)
+        self.reg0 = self.sp
         self.read32()
-        self.reg3 = self.reg2.copy()
+        self.reg3 = self.reg2
 
-        self.dec_sp(FOUR32())
-        self.reg0 = self.sp.copy()
+        self.dec_sp(FOUR32)
+        self.reg0 = self.sp
         self.read32()
-        self.reg0 = self.reg2.copy()
-        self.reg1 = self.reg3.copy()
+        self.reg0 = self.reg2
+        self.reg1 = self.reg3
 
     def execute(self):
         if self.ir.array[0] == Number8([False, False, True, True, False, False, False, False]):
             # ADD
             self.read_two_args_from_ram()
             self.add()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, False, False, True]):
             # SUB
             self.read_two_args_from_ram()
             self.sub()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, False, True, False]):
             # MUL
             self.read_two_args_from_ram()
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, False, True, True]):
             # DIV
             self.read_two_args_from_ram()
             self.div()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, False, False]):
             # INV
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
-            self.reg0 = self.reg2.copy()
+            self.reg0 = self.reg2
             if self.is_zero():
-                self.reg1 = ONE32()
+                self.reg1 = ONE32
             else:
-                self.reg1 = ZERO32()
-            self.reg0 = self.sp.copy()
+                self.reg1 = ZERO32
+            self.reg0 = self.sp
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, False, True]):
             # PUSH
-            self.reg1 = self.reg0.copy()
-            self.reg0 = self.sp.copy()
+            self.reg1 = self.reg0
+            self.reg0 = self.sp
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(FIVE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(FIVE32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, True, False]):
             # POP
-            self.reg1 = FOUR32()
+            self.reg1 = FOUR32
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.sub()
-            self.sp = self.reg2.copy()
-            self.inc_ip(TWO32())
+            self.sp = self.reg2
+            self.inc_ip(TWO32)
         elif self.ir.array[0] == Number8([False, False, True, True, False, True, True, True]):
             # STORE
-            self.reg1 = ONE32()
+            self.reg1 = ONE32
             self.add()
 
-            self.reg0 = FOUR32()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = FOUR32
+            self.reg1 = self.reg2
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.sub()
-            self.reg3 = self.reg2.copy()
+            self.reg3 = self.reg2
 
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
 
-            self.reg0 = self.reg3.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.reg3
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_ip(THREE32())
+            self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, False, False]):
             # DSTORE
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
 
-            self.reg0 = FOUR32()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = FOUR32
+            self.reg1 = self.reg2
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.sub()
-            self.reg3 = self.reg2.copy()
+            self.reg3 = self.reg2
 
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
 
-            self.reg0 = self.reg3.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.reg3
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_ip(ONE32())
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, False, True]):
             # LOAD
-            self.reg1 = ONE32()
+            self.reg1 = ONE32
             self.add()
 
-            self.reg0 = FOUR32()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = FOUR32
+            self.reg1 = self.reg2
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.sub()
 
-            self.reg0 = self.reg2.copy()
+            self.reg0 = self.reg2
             self.read32()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
+            self.inc_sp(FOUR32)
 
-            self.inc_ip(THREE32())
+            self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, True, False]):
             # DLOAD
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
 
-            self.reg0 = FOUR32()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = FOUR32
+            self.reg1 = self.reg2
             self.mul()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.sub()
 
-            self.reg0 = self.reg2.copy()
+            self.reg0 = self.reg2
             self.read32()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, False, True, True]):
             # JUMP
-            self.reg1 = self.ip.copy()
+            self.reg1 = self.ip
             self.add()
-            self.ip = self.reg2.copy()
+            self.ip = self.reg2
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, False, False]):
             # JUMP0
-            self.reg3 = self.reg0.copy()
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.reg3 = self.reg0
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
-            self.reg0 = self.reg2.copy()
+            self.reg0 = self.reg2
             if self.is_zero():
-                self.reg0 = self.ip.copy()
-                self.reg1 = self.reg3.copy()
+                self.reg0 = self.ip
+                self.reg1 = self.reg3
                 self.add()
-                self.ip = self.reg2.copy()
+                self.ip = self.reg2
             else:
-                self.inc_ip(THREE32())
+                self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, False, True]):
             # JUMPA
-            self.ip = self.reg0.copy()
+            self.ip = self.reg0
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, True, False]):
             # DUMP
-            self.reg1 = self.ip.copy()
+            self.reg1 = self.ip
             self.add()
-            self.reg1 = self.reg2.copy()
-            self.reg0 = self.sp.copy()
+            self.reg1 = self.reg2
+            self.reg0 = self.sp
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(THREE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, False, True, True, True, True, True, True]):
             # RETURN
-            self.dec_sp(FOUR32())
-            self.reg0 = self.sp.copy()
+            self.dec_sp(FOUR32)
+            self.reg0 = self.sp
             self.read32()
-            self.ip = self.reg2.copy()
+            self.ip = self.reg2
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, False, False]):
             # ALLOC
             while True:
                 if self.is_zero():
                     break
-                self.reg3 = self.reg0.copy()
-                self.reg0 = self.sp.copy()
-                self.reg1 = ZERO32()
+                self.reg3 = self.reg0
+                self.reg0 = self.sp
+                self.reg1 = ZERO32
                 self.write32()
-                self.inc_sp(FOUR32())
-                self.reg0 = self.reg3.copy()
-                self.reg1 = ONE32()
+                self.inc_sp(FOUR32)
+                self.reg0 = self.reg3
+                self.reg1 = ONE32
                 self.sub()
-                self.reg0 = self.reg2.copy()
-            self.inc_ip(THREE32())
+                self.reg0 = self.reg2
+            self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, False, True]):
             # CRASH
             raise ValueError("Error")
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, True, False]):
             # NOOP
-            self.inc_ip(ONE32())
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, True, True]):
             # LESS
             self.read_two_args_from_ram()
             if self.reg0 < self.reg1:
-                self.reg2 = ONE32()
+                self.reg2 = ONE32
             else:
-                self.reg2 = ZERO32()
-            self.reg0 = self.sp.copy()
-            self.reg1 = self.reg2.copy()
+                self.reg2 = ZERO32
+            self.reg0 = self.sp
+            self.reg1 = self.reg2
             self.write32()
-            self.inc_sp(FOUR32())
-            self.inc_ip(ONE32())
+            self.inc_sp(FOUR32)
+            self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([True, True, True, True, True, True, True, True]):
             raise ValueError("Finished successfully")
         else:
@@ -358,28 +354,28 @@ class CPU:
         self.reg2 = self.reg0 < self.reg1
 
     def is_zero(self):
-        return self.reg0 == ZERO32()
+        return self.reg0 == ZERO32
 
     def inc_ip(self, value):
-        self.reg0 = self.ip.copy()
-        self.reg1 = value.copy()
+        self.reg0 = self.ip
+        self.reg1 = value
         self.add()
-        self.ip = self.reg2.copy()
+        self.ip = self.reg2
 
     def inc_sp(self, value):
-        self.reg0 = self.sp.copy()
-        self.reg1 = value.copy()
+        self.reg0 = self.sp
+        self.reg1 = value
         self.add()
-        self.sp = self.reg2.copy()
+        self.sp = self.reg2
 
     def dec_sp(self, value):
-        self.reg0 = self.sp.copy()
-        self.reg1 = value.copy()
+        self.reg0 = self.sp
+        self.reg1 = value
         self.sub()
-        self.sp = self.reg2.copy()
+        self.sp = self.reg2
 
     def read(self):
-        self.reg2 = Number32([ZERO8(), ZERO8(), ZERO8(), self.motherboard.read_ram8(self.reg0)])
+        self.reg2 = Number32([ZERO8, ZERO8, ZERO8, self.motherboard.read_ram8(self.reg0)])
 
     def read32(self):
         self.reg2 = self.motherboard.read_ram32(self.reg0)
@@ -395,7 +391,7 @@ class Lionboard:
     def __init__(self):
         self.memory = Memory(self, size=64 * 1024)
         self.cpu = CPU(self)
-        self.stack_start = ZERO32()
+        self.stack_start = ZERO32
 
     def read_ram8(self, idx: Number32) -> Number8:
         return self.memory.read8(idx)

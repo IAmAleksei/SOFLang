@@ -6,18 +6,11 @@ class Number8:
         assert len(value) == 8
         self.array = value
 
-    def copy(self):
-        return Number8([b for b in self.array])
-
-    def clear(self):
-        for i in range(8):
-            self.array[i] = False
-
     def __eq__(self, other):
         return self.comp(other) == 0
 
     def add(self, other, tmp=False) -> Tuple['Number8', bool]:
-        res = ZERO8()
+        res = ZERO8M()
         for i in range(7, -1, -1):
             res.array[i] = (self.array[i] and not other.array[i] and not tmp) or (
                         not self.array[i] and other.array[i] and not tmp) or (
@@ -27,7 +20,7 @@ class Number8:
         return res, tmp
 
     def inv(self):
-        res = ZERO8()
+        res = ZERO8M()
         for i in range(8):
             res.array[i] = not self.array[i]
         return res
@@ -51,12 +44,6 @@ class Number8:
     def __str__(self):
         return str(self.to_int())
 
-    def __getitem__(self, item):
-        return self.array[item]
-
-    def __setitem__(self, key, value):
-        self.array[key] = value
-
 
 def num8_from_int(v):
     res = []
@@ -73,12 +60,8 @@ class AbstractNumber:
         assert len(value) == self.length
         self.array = value
 
-    def copy(self):
-        return type(self)([b.copy() for b in self.array])
-
-    def clear(self):
-        for i in range(self.length):
-            self.array[i] = ZERO8()
+    def get_zero(self):
+        return type(self)([ZERO8M() for _ in range(self.length)])
 
     def __eq__(self, other):
         for i in range(self.length):
@@ -87,63 +70,52 @@ class AbstractNumber:
         return True
 
     def __add__(self, other):
-        res = ZERO32()
+        res = self.get_zero()
         tmp = False
         for i in range(self.length - 1, -1, -1):
             res.array[i], tmp = self.array[i].add(other.array[i], tmp)
-        assert num32_from_int(self.to_int() + other.to_int()) == res
         return res
 
     def __neg__(self):
-        res = ZERO32()
+        res = self.get_zero()
         for i in range(self.length - 1, -1, -1):
             res.array[i] = self.array[i].inv()
-        res = res + ONE32()
-        assert num32_from_int(-self.to_int()) == res
-        return res
+        return res + ONE32
 
     def __sub__(self, other):
-        res = self + (-other)
-        assert num32_from_int(self.to_int() - other.to_int()) == res
-        return res
+        return self + (-other)
 
     def __mul__(self, other):
-        res = ZERO32()
-        for i in range(0, 8 * self.length):
+        res = self.get_zero()
+        for i in range(8 * self.length):
             res = res << 1
             if other[i]:
                 res = res + self
-        assert num32_from_int(self.to_int() * other.to_int()) == res
         return res
 
     def __truediv__(self, other):
         a = self
         b = other
-        neg_result = a[0] ^ b[0]
         if a[0]:
             a = -a
             assert not a[0]
         if b[0]:
             b = -b
             assert not b[0]
-        highest_bit = -1
-        for i in range(self.length * 8):
-            if b[i]:
-                highest_bit = i
-                break
+        highest_bit = next((i for i in range(self.length * 8) if b[i]), -1)
         if highest_bit == -1:
             raise RuntimeError("Division by zero")
-        res = ZERO32()
+        res = self.get_zero()
         for shift in range(highest_bit - 1, -1, -1):
             res = res << 1
-            shifted = other << shift
+            shifted = b << shift
             if not (a < shifted):
                 a = a - shifted
-                res = res + ONE32()
-        if neg_result:
-            return -res
-        else:
+                res = res + ONE32
+        if self[0] == other[0]:
             return res
+        else:
+            return -res
 
     def __lt__(self, other):
         if self == other:
@@ -159,25 +131,22 @@ class AbstractNumber:
         return False
 
     def __getitem__(self, item):
-        block_idx = item // 8
-        inner_idx = item % 8
-        return self.array[block_idx][inner_idx]
-
-    def __setitem__(self, key, value):
-        block_idx = key // 8
-        inner_idx = key % 8
-        self.array[block_idx][inner_idx] = value
+        return self.array[item // 8].array[item % 8]
 
     def __lshift__(self, sz):
-        res = ZERO32()
+        res = self.get_zero()
         for i in range(self.length * 8 - sz):
-            res[i] = self[i + sz]
+            res.array[i // 8].array[i % 8] = self[i + sz]
         return res
 
     def extend_from_num16(self):
-        if self[self.length * 8 - 16]:
-            self.array[0] = MAX8()
-            self.array[1] = MAX8()
+        res = self.get_zero()
+        for i in range(self.length - 2, self.length):
+            res.array[i] = self.array[i]
+        if res[self.length * 8 - 16]:
+            for i in range(self.length - 2):
+                res.array[i] = MAX8
+        return res
 
     def to_int(self):
         res = 0
@@ -208,61 +177,24 @@ def num32_from_int(v):
     return Number32(res[::-1])
 
 
-def ZERO8():
+def ZERO8M():
     return Number8([False, False, False, False, False, False, False, False])
 
 
-def ONE8():
-    return Number8([False, False, False, False, False, False, False, True])
+ZERO8 = Number8([False, False, False, False, False, False, False, False])
+ONE8 = Number8([False, False, False, False, False, False, False, True])
+TWO8 = Number8([False, False, False, False, False, False, True, False])
+THREE8 = Number8([False, False, False, False, False, False, True, True])
+FOUR8 = Number8([False, False, False, False, False, True, False, False])
+FIVE8 = Number8([False, False, False, False, False, True, False, True])
+MAX8 = Number8([True, True, True, True, True, True, True, True])
 
 
-def TWO8():
-    return Number8([False, False, False, False, False, False, True, False])
+ZERO32 = Number32([ZERO8, ZERO8, ZERO8, ZERO8])
+ONE32 = Number32([ZERO8, ZERO8, ZERO8, ONE8])
+TWO32 = Number32([ZERO8, ZERO8, ZERO8, TWO8])
+THREE32 = Number32([ZERO8, ZERO8, ZERO8, THREE8])
+FOUR32 = Number32([ZERO8, ZERO8, ZERO8, FOUR8])
+FIVE32 = Number32([ZERO8, ZERO8, ZERO8, FIVE8])
+ZERO64 = Number64([ZERO8, ZERO8, ZERO8, ZERO8, ZERO8, ZERO8, ZERO8, ZERO8])
 
-
-def THREE8():
-    return Number8([False, False, False, False, False, False, True, True])
-
-
-def FOUR8():
-    return Number8([False, False, False, False, False, True, False, False])
-
-
-def FIVE8():
-    return Number8([False, False, False, False, False, True, False, True])
-
-
-def MAX8():
-    return Number8([True, True, True, True, True, True, True, True])
-
-
-def ZERO32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), ZERO8()])
-
-
-def ONE32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), ONE8()])
-
-
-def TWO32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), TWO8()])
-
-
-def THREE32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), THREE8()])
-
-
-def FOUR32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), FOUR8()])
-
-
-def FIVE32():
-    return Number32([ZERO8(), ZERO8(), ZERO8(), FIVE8()])
-
-
-def ZERO64():
-    return Number64([ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8()])
-
-
-def ONE64():
-    return Number64([ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ZERO8(), ONE8()])
