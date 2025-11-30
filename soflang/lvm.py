@@ -1,6 +1,6 @@
 from typing import List, Callable
 
-from arch.components import Lionboard
+from arch.components import Bearboard
 from arch.logic import num8_from_int, num32_from_int
 from soflang.asm import ExecutionContext, Instruction, ExitI
 from soflang.binarify import decode_binary_asm
@@ -33,7 +33,7 @@ class LionVM:
         self.run_abstract(lambda x: decode_binary_asm(bs, x), binary_source=True)
 
     def run_with_cpu_simulation(self, bs: bytes):
-        board = Lionboard()
+        board = Bearboard()
         board.load_program([num8_from_int(b) for b in bs])
         steps = 0
         try:

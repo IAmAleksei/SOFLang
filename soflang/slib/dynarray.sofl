@@ -34,6 +34,16 @@ Dynarray<V,S> set_in_dynarray<V,S>(Dynarray<V,S> cur, Num idx, <V> v) {
     result = Dynarray<V,S>(items, size)
 }
 
+<V> last_in_dynarray<V,S>(Dynarray<V,S> cur) {
+    auto last = cur#size
+    auto idx = last - 1
+    idx < 0 ?? {
+        error
+    }
+    auto items = cur#items
+    result = items[idx]
+}
+
 Dynarray<V,S> pop_from_dynarray<V,S>(Dynarray<V,S> cur) {
     auto last = cur#size
     auto idx = last - 1
@@ -54,7 +64,7 @@ Dynarray<V,S> remove_from_dynarray<V,S>(Dynarray<V,S> cur, Num idx) {
         items[idx] = items[nextidx]
         idx = idx + 1
     }
-    Num newsize = size - 1
+    Num newsize = cur#size - 1
     result = Dynarray<V,S>(items, newsize)
 }
 

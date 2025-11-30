@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 from typing import List, Callable
 
-from arch.components import Lionboard
+from arch.components import Bearboard
 from arch.logic import num8_from_int, num32_from_int
-from soflang.asm import ExecutionContext, ExitI, TranslationResult
+from soflang.asm import ExecutionContext, TranslationResult
 from soflang.binarify import encode_binary_asm
 
 
@@ -21,7 +21,9 @@ class VarDebugInfo:
         return f"{self.name} = {v}"
 
 
-class AbstractDebugger:
+class AbstractFoxbugger:
+    spacing = 1
+
     def __init__(self, compiled_code_with_debug_info: TranslationResult, source_code: List[str]):
         self.steps = 0
         self.instructions = compiled_code_with_debug_info.asm_instructions
@@ -42,7 +44,7 @@ class AbstractDebugger:
         self.make_step()
         if cur_ip in self.debug_info.variable_allocations:
             var_name, var_size = self.debug_info.variable_allocations[cur_ip]
-            self.vars.append(VarDebugInfo(var_name, self.get_cur_sp() - (var_size - 1) * self.get_spacing(), var_size))
+            self.vars.append(VarDebugInfo(var_name, self.get_cur_sp() - (var_size - 1) * self.spacing, var_size))
         while len(self.vars) > 0 and self.get_cur_sp() < self.vars[-1].start_sp:
             self.vars.pop()
         self.cur_line = self.debug_info.source_code_lines[self.get_cur_ip()]
@@ -53,14 +55,11 @@ class AbstractDebugger:
     def load_stack_value(self, idx) -> int:
         raise ValueError("not implemented")
 
-    def get_spacing(self):
-        raise ValueError("not implemented")
-
     def print_state(self):
         stack_end = self.get_cur_sp() + 1
-        stack_start = max(stack_end - 40 * self.get_spacing() - 1, 0)
+        stack_start = max(stack_end - 40 * self.spacing - 1, 0)
         print()
-        shown_values = [self.load_stack_value(i) for i in range(stack_start, stack_end, self.get_spacing())]
+        shown_values = [self.load_stack_value(i) for i in range(stack_start, stack_end, self.spacing)]
         print(f"-----------------------------------------------------------{stack_end}")
         print(f"| {' '.join(map(str, shown_values[::-1]))}")
         print("--------------------------------------------------------------")
@@ -69,7 +68,7 @@ class AbstractDebugger:
             print(code_line)
             print("-" * len(code_line))
         for v in self.vars:
-            print(v.format(self.load_stack_value, self.get_spacing()))
+            print(v.format(self.load_stack_value, self.spacing))
         print()
         cur_ip = self.get_cur_ip()
         asm_prefix = f"{cur_ip + 1}"
@@ -82,13 +81,10 @@ class AbstractDebugger:
         print()
 
 
-class Debugger(AbstractDebugger):
+class FoxbuggerSimple(AbstractFoxbugger):
     def __init__(self, compiled_code_with_debug_info: TranslationResult, source_code: List[str]):
         super().__init__(compiled_code_with_debug_info, source_code)
         self.ec = ExecutionContext([0] * 1200, 20, 0, binary_source=False)
-
-    def get_spacing(self):
-        return 1
 
     def get_cur_sp(self):
         return self.ec.sp
@@ -103,18 +99,17 @@ class Debugger(AbstractDebugger):
         return self.ec.load_num(idx)
 
 
-class DebuggerWithCPU(AbstractDebugger):
+class FoxbuggerWithHPU(AbstractFoxbugger):
+    spacing = 4
+
     def __init__(self, compiled_code_with_debug_info: TranslationResult, source_code: List[str]):
         super().__init__(compiled_code_with_debug_info, source_code)
-        self.board = Lionboard()
+        self.board = Bearboard()
         bs, self.instruction_mapping = encode_binary_asm(compiled_code_with_debug_info.asm_instructions)
         self.board.load_program([num8_from_int(b) for b in bs])
 
-    def get_spacing(self):
-        return 4
-
     def get_cur_sp(self):
-        return self.board.cpu.sp.to_int() - self.get_spacing()
+        return self.board.cpu.sp.to_int() - self.spacing
 
     def make_step(self):
         self.board.step_program()
@@ -126,7 +121,7 @@ class DebuggerWithCPU(AbstractDebugger):
         return self.board.memory.read32(num32_from_int(idx)).to_int()
 
 
-def run_debugger(debugger: AbstractDebugger):
+def run_debugger(debugger: AbstractFoxbugger):
     debugger.print_state()
     try:
         while True:
@@ -134,13 +129,13 @@ def run_debugger(debugger: AbstractDebugger):
             if i == "":
                 debugger.forward()
             elif i == "l":
-                prev_line = debugger.cur_line
-                while debugger.cur_line == prev_line:
+                start_line = debugger.cur_line
+                while debugger.cur_line == start_line:
                     debugger.forward()
             elif i == "f":
                 while True:
                     debugger.forward()
             debugger.print_state()
-    except ValueError as e:
+    except Exception as e:
         print(f"Exception: {e}")
         debugger.print_state()

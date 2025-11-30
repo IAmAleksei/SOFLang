@@ -1,0 +1,20 @@
+load @/graph
+load @/dynarray
+
+Num main() {
+    Dynarray<Num,4>*4 edges
+    Dynarray<Num,4> edges0
+    Dynarray<Num,4> edges1
+    Dynarray<Num,4> edges2
+    Dynarray<Num,4> edges3
+    edges0 = add_to_dynarray<Num,4>(edges0, 1)
+    edges1 = add_to_dynarray<Num,4>(edges1, 0)
+    edges1 = add_to_dynarray<Num,4>(edges1, 3)
+    edges3 = add_to_dynarray<Num,4>(edges3, 1)
+    edges[0] = edges0
+    edges[1] = edges1
+    edges[2] = edges2
+    edges[3] = edges3
+    auto graph = Graph<4>(edges)
+    result = count_component<4>(graph)
+}

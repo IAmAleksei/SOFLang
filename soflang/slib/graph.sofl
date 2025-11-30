@@ -1,1 +1,29 @@
-Graph: edges#Dynarray<Num,10>
+load @/dynarray
+
+Graph<S>: edges#Dynarray<Num,S>*<S>
+
+Num count_component<S>(Graph<S> graph) {
+    auto alledges = graph#edges
+    Dynarray<Num,S> queue
+    Num*<S> used
+    queue = add_to_dynarray<Num,S>(queue, 0)
+    used[0] = 1
+    auto check = queue#size ~ 0
+    check ~ 0 ...? {
+        result = result + 1
+        auto elem = last_in_dynarray<Num,S>(queue)
+        queue = pop_from_dynarray<Num,S>(queue)
+        auto edges = alledges[elem]
+        auto i = edges#size
+        i ...? {
+            auto ri = i - 1
+            auto to = get_from_dynarray<Num,S>(edges, ri)
+            used[to] ~ 0 ?? {
+                used[to] = 1
+                queue = add_to_dynarray<Num,S>(queue, to)
+            }
+            i = i - 1
+        }
+        check = queue#size ~ 0
+    }
+}

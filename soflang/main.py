@@ -6,10 +6,9 @@ from soflang.analyzer import BonAnalyzer, Function
 from soflang.asm import (
     parse_asm, translate,
 )
-from soflang.binarify import decode_binary_asm, encode_binary_asm
-from soflang.debugger import run_debugger, DebuggerWithCPU
+from soflang.binarify import encode_binary_asm
+from soflang.debugger import run_debugger, FoxbuggerWithHPU
 from soflang.lvm import LionVM
-from soflang.preprocess import recursive_parse
 from soflang.validator import MilliValidator
 
 
@@ -111,7 +110,7 @@ def compile_and_debug(ifile):
 
     enriched_result = translate(analyzer.get_functions(), analyzer.classes, with_debug=True)
 
-    debugger = DebuggerWithCPU(enriched_result, text.split('\n'))
+    debugger = FoxbuggerWithHPU(enriched_result, text.split('\n'))
     run_debugger(debugger)
 
 

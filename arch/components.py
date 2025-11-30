@@ -4,11 +4,11 @@ from arch.logic import Number8, Number32, Number64, ONE32, ZERO64, ZERO32, FOUR3
     num32_from_int
 
 
-class Memory:
-    def __init__(self, motherboard: 'Lionboard', size=512 * 4):
+class FurMemory:
+    def __init__(self, board: 'Bearboard', size=512 * 4):
         self.size = size
         self.array: List[Number8] = [Number8([False] * 8) for _ in range(self.size)]
-        self.motherboard = motherboard
+        self.board = board
 
     def read8(self, idx: Number32) -> Number8:
         return self.array[idx.to_int()]
@@ -32,8 +32,8 @@ class Memory:
 
 
 # TODO: cache L1/L2/L3
-class CPU:
-    def __init__(self, motherboard: 'Lionboard'):
+class HoneyProcessingUnit:
+    def __init__(self, board: 'Bearboard'):
         self.ip: Number32 = ZERO32
         self.reg0: Number32 = ZERO32
         self.reg1: Number32 = ZERO32
@@ -43,7 +43,7 @@ class CPU:
         self.reg5: Number32 = ZERO32
         self.ir: Number64 = ZERO64
         self.sp: Number32 = ZERO32
-        self.motherboard: Lionboard = motherboard
+        self.board: Bearboard = board
 
     def cycle(self):
         self.fetch()
@@ -317,7 +317,7 @@ class CPU:
             self.inc_ip(THREE32)
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, False, True]):
             # CRASH
-            raise ValueError("Error")
+            raise ValueError("The program has crashed. Only Sofa knows why...")
         elif self.ir.array[0] == Number8([False, True, False, False, False, False, True, False]):
             # NOOP
             self.inc_ip(ONE32)
@@ -334,7 +334,7 @@ class CPU:
             self.inc_sp(FOUR32)
             self.inc_ip(ONE32)
         elif self.ir.array[0] == Number8([True, True, True, True, True, True, True, True]):
-            raise ValueError("Finished successfully")
+            raise ValueError("The program has reached the end")
         else:
             raise ValueError(f"Unsupported instruction: {self.ir.array[0]}")
 
@@ -375,22 +375,22 @@ class CPU:
         self.sp = self.reg2
 
     def read(self):
-        self.reg2 = Number32([ZERO8, ZERO8, ZERO8, self.motherboard.read_ram8(self.reg0)])
+        self.reg2 = Number32([ZERO8, ZERO8, ZERO8, self.board.read_ram8(self.reg0)])
 
     def read32(self):
-        self.reg2 = self.motherboard.read_ram32(self.reg0)
+        self.reg2 = self.board.read_ram32(self.reg0)
 
     def write(self):
-        self.motherboard.write_ram8(self.reg0, self.reg1.array[3])
+        self.board.write_ram8(self.reg0, self.reg1.array[3])
 
     def write32(self):
-        self.motherboard.write_ram32(self.reg0, self.reg1)
+        self.board.write_ram32(self.reg0, self.reg1)
 
 
-class Lionboard:
+class Bearboard:
     def __init__(self):
-        self.memory = Memory(self, size=64 * 1024)
-        self.cpu = CPU(self)
+        self.memory = FurMemory(self, size=64 * 1024)
+        self.cpu = HoneyProcessingUnit(self)
         self.stack_start = ZERO32
 
     def read_ram8(self, idx: Number32) -> Number8:
